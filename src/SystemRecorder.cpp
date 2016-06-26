@@ -35,6 +35,7 @@ namespace {
 enum RecordType : uint8_t {
 	RECORD_TYPE_SYS_STATS = 0,
 	RECORD_TYPE_PROCESS_STATS,
+	RECORD_TYPE_THREAD_STATS,
 
 	RECORD_TYPE_COUNT
 };
@@ -68,6 +69,7 @@ public:
 
 	virtual int record(const SystemMonitor::SystemStats &stats) override;
 	virtual int record(const SystemMonitor::ProcessStats &stats) override;
+	virtual int record(const SystemMonitor::ThreadStats &stats) override;
 };
 
 SystemRecorderImpl::SystemRecorderImpl() : SystemRecorder()
@@ -146,6 +148,31 @@ int SystemRecorderImpl::initDescs()
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	mDescList[RECORD_TYPE_PROCESS_STATS] = desc;
+	desc = nullptr;
+
+	// ThreadStats
+	desc = new StructDescInternal();
+	if (!desc)
+		return -ENOMEM;
+
+	desc->mName = "threadstats";
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mPid, "pid");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mTid, "tid");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mName, "name");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mCpuLoad, "cpuload");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	mDescList[RECORD_TYPE_THREAD_STATS] = desc;
 	desc = nullptr;
 
 	return 0;
@@ -280,6 +307,19 @@ int SystemRecorderImpl::record(const SystemMonitor::ProcessStats &stats)
 	RETURN_IF_WRITE_FAILED(ret);
 
 	ret = mDescList[RECORD_TYPE_PROCESS_STATS]->mDesc.writeValue(mSink, &stats);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	return 0;
+}
+
+int SystemRecorderImpl::record(const SystemMonitor::ThreadStats &stats)
+{
+	int ret;
+
+	ret = ValueTrait<uint8_t>::write(mSink, RECORD_TYPE_THREAD_STATS);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	ret = mDescList[RECORD_TYPE_THREAD_STATS]->mDesc.writeValue(mSink, &stats);
 	RETURN_IF_WRITE_FAILED(ret);
 
 	return 0;

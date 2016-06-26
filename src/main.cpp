@@ -166,6 +166,14 @@ int main(int argc, char *argv[])
 			printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
 	};
 
+	cb.mThreadStats = [recorder] (const SystemMonitor::ThreadStats &stats) {
+		int ret;
+
+		ret = recorder->record(stats);
+		if (ret < 0)
+			printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+	};
+
 	mon = SystemMonitor::create(cb);
 	if (!mon)
 		goto error;

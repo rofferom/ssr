@@ -9,6 +9,7 @@
 
 #include <string>
 #include <list>
+#include <map>
 
 #include "SystemMonitor.hpp"
 
@@ -22,7 +23,7 @@ namespace {
 
 #define STAT_PATTERN_COUNT 24
 
-struct ProcessRawStats {
+struct RawStats {
 	int pid;
 	char name[128];
 	char state;
@@ -48,7 +49,7 @@ struct ProcessRawStats {
 	unsigned long int vsize;
 	long int rss;
 
-	ProcessRawStats()
+	RawStats()
 	{
 		pid = 0;
 		name[0] = '\0';
@@ -84,27 +85,52 @@ struct SystemSettings {
 
 class ProcessMonitor {
 private:
+	struct ThreadInfo {
+		char mPath[128];
+		char mName[64];
+		RawStats mPrevStats;
+	};
+
+private:
 	int mPid;
 	std::string mName;
-	ProcessRawStats mPrevStats;
+	RawStats mPrevStats;
 	const SystemSettings *mSysSettings;
 
 	bool mFirstProcess;
+
+	std::map<int, ThreadInfo> mThreads;
 
 private:
 	void clear();
 
 	int getPidFdCount();
 
-	static int getPidStats(int pid, ProcessRawStats *procstat);
+	static int readStats(const char *path, RawStats *procstat);
 	static bool testPidName(int pid, const char *name);
 	static int findProcess(const char *name, int *outPid);
+
+	static uint16_t getCpuLoad(const RawStats &prevStats,
+				   const RawStats &curStats,
+				   const SystemSettings *sysSettings,
+				   int timeDiff);
+
+	int processThread(int tid,
+			  uint64_t ts,
+			  int timeDiff,
+			  const SystemMonitor::Callbacks &cb);
+
+
+	int processThreads(uint64_t ts,
+			   int timeDiff,
+			   const SystemMonitor::Callbacks &cb);
 
 public:
 	ProcessMonitor(const char *name, const SystemSettings *sysSettings);
 
-	int process(int timeDiff,
-		    SystemMonitor::ProcessStats *processStats);
+	int process(uint64_t ts,
+		    int timeDiff,
+		    const SystemMonitor::Callbacks &cb);
 };
 
 ProcessMonitor::ProcessMonitor(const char *name,
@@ -122,15 +148,145 @@ void ProcessMonitor::clear()
 	mFirstProcess = true;
 }
 
-int ProcessMonitor::process(int timeDiff,
-			    SystemMonitor::ProcessStats *stats)
+uint16_t ProcessMonitor::getCpuLoad(const RawStats &prevStats,
+				    const RawStats &curStats,
+				    const SystemSettings *sysSettings,
+				    int timeDiff)
 {
-	ProcessRawStats rawStats;
 	long int spentTime;
+
+	spentTime  = curStats.utime + curStats.stime;
+	spentTime -= prevStats.utime + prevStats.stime;
+
+	return (100 * spentTime) / (sysSettings->mHertz * timeDiff);
+}
+
+int ProcessMonitor::processThread(int tid,
+				  uint64_t ts,
+				  int timeDiff,
+				  const SystemMonitor::Callbacks &cb)
+{
+	ThreadInfo *info;
+	SystemMonitor::ThreadStats stats;
+	RawStats rawStats;
 	int ret;
 
-	if (!stats)
-		return -EINVAL;
+	auto thread = mThreads.find(tid);
+	if (thread == mThreads.end()) {
+		ThreadInfo info;
+
+		// Fill thread info
+		snprintf(info.mPath, sizeof(info.mPath),
+			 "/proc/%d/task/%d/stat",
+			 mPid, tid);
+
+		ret = readStats(info.mPath, &info.mPrevStats);
+		if (ret < 0)
+			return ret;
+
+		snprintf(info.mName, sizeof(info.mName),
+			 "%d-%s",
+			 tid,
+			 info.mPrevStats.name);
+
+		// Register thread
+		auto insertRet = mThreads.insert( {tid, info} );
+		if (!insertRet.second) {
+			printf("Fail to insert thread %d\n", tid);
+			return -EPERM;
+		}
+
+		return -EAGAIN;
+	}
+
+	info = &thread->second;
+
+	ret = readStats(info->mPath, &rawStats);
+	if (ret < 0) {
+		// Thread finished
+		mThreads.erase(thread);
+		return ret;
+	}
+
+	stats.mTs = ts;
+	stats.mPid = mPid;
+	stats.mTid = tid;
+	stats.mName = info->mName;
+
+	stats.mCpuLoad = getCpuLoad(info->mPrevStats,
+				    rawStats,
+				    mSysSettings,
+				    timeDiff);
+
+	info->mPrevStats = rawStats;
+
+	if (cb.mThreadStats)
+		cb.mThreadStats(stats);
+
+	return 0;
+}
+
+int ProcessMonitor::processThreads(uint64_t ts,
+				   int timeDiff,
+				   const SystemMonitor::Callbacks &cb)
+{
+	DIR *d;
+	struct dirent entry;
+	struct dirent *result = nullptr;
+	char path[128];
+	int tid;
+	char *endptr;
+	int ret;
+
+	snprintf(path, sizeof(path), "/proc/%d/task", mPid);
+
+	d = opendir(path);
+	if (!d) {
+		ret = -errno;
+		printf("Fail to open /proc : %d(%m)\n", errno);
+		return ret;
+	}
+
+	while (true) {
+		ret = readdir_r(d, &entry, &result);
+		if (ret > 0) {
+			printf("readdir_r() failed : %d(%s)\n",
+			       ret, strerror(ret));
+			ret = -ret;
+			goto closedir;
+		} else if (ret == 0 && !result) {
+			break;
+		}
+
+		tid = strtol(entry.d_name, &endptr, 10);
+		if (errno == ERANGE) {
+			printf("Ignore %s\n", entry.d_name);
+			continue;
+		} else if (*endptr != '\0') {
+			continue;
+		}
+
+		ret = processThread(tid, ts, timeDiff, cb);
+		if (ret < 0 && ret != -EAGAIN)
+			printf("Fail to process thread %d\n", tid);
+	}
+
+	closedir(d);
+
+	return 0;
+
+closedir:
+	return ret;
+}
+
+int ProcessMonitor::process(uint64_t ts,
+			    int timeDiff,
+			    const SystemMonitor::Callbacks &cb)
+{
+	SystemMonitor::ProcessStats stats;
+	RawStats rawStats;
+	char path[64];
+	int ret;
 
 	if (mPid == INVALID_PID) {
 		ret = findProcess(mName.c_str(), &mPid);
@@ -138,8 +294,10 @@ int ProcessMonitor::process(int timeDiff,
 			return ret;
 	}
 
+	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
+
 	if (mFirstProcess) {
-		ret = getPidStats(mPid, &mPrevStats);
+		ret = readStats(path, &mPrevStats);
 		if (ret < 0) {
 			printf("Can't find pid stats '%s'\n", mName.c_str());
 			return ret;
@@ -151,27 +309,34 @@ int ProcessMonitor::process(int timeDiff,
 	}
 
 	// Get stats
-	ret = getPidStats(mPid, &rawStats);
+	ret = readStats(path, &rawStats);
 	if (ret < 0) {
 		printf("Can't find pid stats '%s'\n", mName.c_str());
 		clear();
 		return ret;
 	}
 
-	// Compute stats
-	spentTime  = rawStats.utime + rawStats.stime;
-	spentTime -= mPrevStats.utime + mPrevStats.stime;
+	stats.mTs = ts;
+	stats.mPid = mPid;
+	stats.mName = mName.c_str();
 
-	stats->mPid = mPid;
-	stats->mName = mName.c_str();
+	stats.mCpuLoad = getCpuLoad(mPrevStats,
+				    rawStats,
+				    mSysSettings,
+				    timeDiff);
 
-	stats->mCpuLoad = (100 * spentTime) / (mSysSettings->mHertz * timeDiff);
-	stats->mVsize = rawStats.vsize / 1024;
-	stats->mRss = rawStats.rss * mSysSettings->mPagesize / 1024;
-	stats->mThreadCount = rawStats.num_threads;
-	stats->mFdCount = getPidFdCount();
+	stats.mVsize = rawStats.vsize / 1024;
+	stats.mRss = rawStats.rss * mSysSettings->mPagesize / 1024;
+	stats.mThreadCount = rawStats.num_threads;
+	stats.mFdCount = getPidFdCount();
 
 	mPrevStats = rawStats;
+
+	if (cb.mProcessStats)
+		cb.mProcessStats(stats);
+
+	// Process threads
+	processThreads(ts, timeDiff, cb);
 
 	return 0;
 }
@@ -208,15 +373,12 @@ int ProcessMonitor::getPidFdCount()
 	return count;
 }
 
-int ProcessMonitor::getPidStats(int pid, ProcessRawStats *procstat)
+int ProcessMonitor::readStats(const char *path, RawStats *procstat)
 {
 	char strstat[1024];
-	char path[64];
 	int fd;
 	ssize_t readRet;
 	int ret;
-
-	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
 
 	// Read process stats
 	fd = open(path, O_RDONLY|O_CLOEXEC);
@@ -281,11 +443,14 @@ error:
 
 bool ProcessMonitor::testPidName(int pid, const char *name)
 {
-	ProcessRawStats procstat;
+	RawStats procstat;
 	size_t procNameLen;
+	char path[128];
 	int ret;
 
-	ret = getPidStats(pid, &procstat);
+	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+
+	ret = readStats(path, &procstat);
 	if (ret < 0)
 		return false;
 
@@ -394,7 +559,6 @@ static int timespecDiff(struct timespec *start, struct timespec *stop)
 
 int SystemMonitorImpl::process()
 {
-	ProcessStats processStats;
 	struct timespec now;
 	int timeDiff; // seconds
 	int ret;
@@ -413,15 +577,9 @@ int SystemMonitorImpl::process()
 		return -EINVAL;
 	}
 
-	// Fill timestamp
-	processStats.mTs = now.tv_sec;
-
 	// Start process monitors
-	for (auto &m :mMonitors) {
-		ret = m->process(timeDiff, &processStats);
-		if (ret == 0)
-			mCb.mProcessStats(processStats);
-	}
+	for (auto &m :mMonitors)
+		m->process(now.tv_sec, timeDiff, mCb);
 
 	mLastProcess = now;
 

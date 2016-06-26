@@ -7,10 +7,11 @@ import argparse
 import jinja2
 from sysstatsrec.parser import Parser
 
+DEFAULT_STRUCTNAME = 'processstats'
 DEFAULT_SAMPLENAME = 'cpuload'
 
 class SysstatsReader:
-	def __init__(self, processList, sampleName):
+	def __init__(self, processList, sampleName, structName):
 		if len(processList) == 0:
 			self.allProcess = True
 			self.processList = []
@@ -19,10 +20,11 @@ class SysstatsReader:
 			self.processList = processList
 
 		self.sampleName = sampleName
+		self.structName = structName
 		self.samples = {}
 
 	def __call__(self, name, data):
-		if name != 'processstats':
+		if name != self.structName:
 			return
 		elif not self.allProcess and data['name'] not in self.processList:
 			return
@@ -63,6 +65,7 @@ def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
 	parser.add_argument('-o', '--output', help='File to generate')
+	parser.add_argument('-S', '--struct', default=DEFAULT_STRUCTNAME, help='Struct name to use')
 	parser.add_argument('-s', '--sample', default=DEFAULT_SAMPLENAME, help='Sample name to use')
 	parser.add_argument('-H', '--header', action='store_true', help='Display input header')
 	parser.add_argument('process', nargs='*', help='Process list to use')
@@ -82,7 +85,7 @@ if __name__ == '__main__':
 			sys.exit(1)
 
 		# Parse record file
-		reader = SysstatsReader(args.process, args.sample)
+		reader = SysstatsReader(args.process, args.sample, args.struct)
 		parser.parse(reader)
 
 		# Generate html

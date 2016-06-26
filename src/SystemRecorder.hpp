@@ -14,6 +14,7 @@ public:
 
 	virtual int record(const SystemMonitor::SystemStats &stats) = 0;
 	virtual int record(const SystemMonitor::ProcessStats &stats) = 0;
+	virtual int record(const SystemMonitor::ThreadStats &stats) = 0;
 
 	static SystemRecorder *create();
 };
