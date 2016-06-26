@@ -62,14 +62,14 @@ class SysstatsReader:
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
-	parser.add_argument('-o', '--output', required=True, help='File to generate')
+	parser.add_argument('-o', '--output', help='File to generate')
 	parser.add_argument('-s', '--sample', default=DEFAULT_SAMPLENAME, help='Sample name to use')
 	parser.add_argument('-H', '--header', action='store_true', help='Display input header')
 	parser.add_argument('process', nargs='*', help='Process list to use')
-	return parser.parse_args()
+	return (parser, parser.parse_args())
 
 if __name__ == '__main__':
-	args = parseArgs()
+	(argParser, args) = parseArgs()
 
 	parser = Parser()
 	parser.open(args.input)
@@ -77,6 +77,10 @@ if __name__ == '__main__':
 	if args.header:
 		parser.printHeader()
 	else:
+		if not args.output:
+			argParser.print_help()
+			sys.exit(1)
+
 		# Parse record file
 		reader = SysstatsReader(args.process, args.sample)
 		parser.parse(reader)
