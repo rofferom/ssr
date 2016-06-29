@@ -86,6 +86,7 @@ struct SystemSettings {
 class ProcessMonitor {
 private:
 	struct ThreadInfo {
+		int mTid;
 		int mFd;;
 		char mName[64];
 		RawStats mPrevStats;
@@ -114,14 +115,19 @@ private:
 				   const SystemSettings *sysSettings,
 				   int timeDiff);
 
-	int processThread(int tid,
+
+	int processThread(ThreadInfo *info,
 			  uint64_t ts,
 			  int timeDiff,
 			  const SystemMonitor::Callbacks &cb);
 
+	int addThread(int tid);
+
+	int researchThreads();
 
 	int processThreads(uint64_t ts,
 			   int timeDiff,
+			   long int numThreads,
 			   const SystemMonitor::Callbacks &cb);
 
 public:
@@ -175,69 +181,26 @@ uint16_t ProcessMonitor::getCpuLoad(const RawStats &prevStats,
 	return (100 * spentTime) / (sysSettings->mHertz * timeDiff);
 }
 
-int ProcessMonitor::processThread(int tid,
+int ProcessMonitor::processThread(ThreadInfo *info,
 				  uint64_t ts,
 				  int timeDiff,
 				  const SystemMonitor::Callbacks &cb)
 {
-	ThreadInfo *info;
 	SystemMonitor::ThreadStats stats;
 	RawStats rawStats;
-	char path[128];
 	int ret;
 
-	auto thread = mThreads.find(tid);
-	if (thread == mThreads.end()) {
-		ThreadInfo newInfo;
-
-		// Fill thread info
-		snprintf(path, sizeof(path),
-			 "/proc/%d/task/%d/stat",
-			 mPid, tid);
-
-		ret = open(path, O_RDONLY|O_CLOEXEC);
-		if (ret == -1) {
-			ret = -errno;
-			printf("Fail to open %s : %d(%m)\n", path, errno);
-			return ret;
-		}
-
-		newInfo.mFd = ret;
-
-		ret = readStats(newInfo.mFd, tid, &newInfo.mPrevStats);
-		if (ret < 0) {
-			close(newInfo.mFd);
-			return ret;
-		}
-
-		snprintf(newInfo.mName, sizeof(newInfo.mName),
-			 "%d-%s",
-			 tid,
-			 newInfo.mPrevStats.name);
-
-		// Register thread
-		auto insertRet = mThreads.insert( {tid, newInfo} );
-		if (!insertRet.second) {
-			printf("Fail to insert thread %d\n", tid);
-			return -EPERM;
-		}
-
-		return -EAGAIN;
-	}
-
-	info = &thread->second;
-
-	ret = readStats(info->mFd, tid, &rawStats);
+	ret = readStats(info->mFd, info->mTid, &rawStats);
 	if (ret < 0) {
 		// Thread finished
 		close(info->mFd);
-		mThreads.erase(thread);
+		mThreads.erase(info->mTid);
 		return ret;
 	}
 
 	stats.mTs = ts;
 	stats.mPid = mPid;
-	stats.mTid = tid;
+	stats.mTid = info->mTid;
 	stats.mName = info->mName;
 
 	stats.mCpuLoad = getCpuLoad(info->mPrevStats,
@@ -253,9 +216,50 @@ int ProcessMonitor::processThread(int tid,
 	return 0;
 }
 
-int ProcessMonitor::processThreads(uint64_t ts,
-				   int timeDiff,
-				   const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::addThread(int tid)
+{
+	ThreadInfo info;
+	char path[128];
+	int ret;
+
+	// Fill thread info
+	snprintf(path, sizeof(path),
+		 "/proc/%d/task/%d/stat",
+		 mPid, tid);
+
+	ret = open(path, O_RDONLY|O_CLOEXEC);
+	if (ret == -1) {
+		ret = -errno;
+		printf("Fail to open %s : %d(%m)\n", path, errno);
+		return ret;
+	}
+
+	info.mTid = tid;
+	info.mFd = ret;
+
+	ret = readStats(info.mFd, tid, &info.mPrevStats);
+	if (ret < 0) {
+		close(info.mFd);
+		return ret;
+	}
+
+	snprintf(info.mName, sizeof(info.mName),
+		 "%d-%s",
+		 tid,
+		 info.mPrevStats.name);
+
+	// Register thread
+	auto insertRet = mThreads.insert( {tid, info} );
+	if (!insertRet.second) {
+		printf("Fail to insert thread %d\n", tid);
+		close(info.mFd);
+		return -EPERM;
+	}
+
+	return 0;
+}
+
+int ProcessMonitor::researchThreads()
 {
 	DIR *d;
 	struct dirent entry;
@@ -293,9 +297,12 @@ int ProcessMonitor::processThreads(uint64_t ts,
 			continue;
 		}
 
-		ret = processThread(tid, ts, timeDiff, cb);
-		if (ret < 0 && ret != -EAGAIN)
-			printf("Fail to process thread %d\n", tid);
+		// Avoid to add thread if already exists
+		if (mThreads.count(tid) == 0) {
+			ret = addThread(tid);
+			if (ret < 0)
+				printf("Fail to add thread %d\n", tid);
+		}
 	}
 
 	closedir(d);
@@ -303,7 +310,39 @@ int ProcessMonitor::processThreads(uint64_t ts,
 	return 0;
 
 closedir:
+	closedir(d);
+
 	return ret;
+}
+
+int ProcessMonitor::processThreads(uint64_t ts,
+				   int timeDiff,
+				   long int numThreads,
+				   const SystemMonitor::Callbacks &cb)
+{
+	long int foundThreads;
+	int ret;
+
+	// Process all already known threads.
+	foundThreads = 0;
+	for (auto &thread : mThreads) {
+		ret = processThread(&thread.second, ts, timeDiff, cb);
+		if (ret < 0)
+			printf("Fail to process thread %d\n", thread.first);
+		else
+			foundThreads++;
+	}
+
+	/**
+	 * If there are missing threads, research any new thread.
+	 * This can happen if :
+	 * - a new thread has been created
+	 * - a known thread has stopped
+	 */
+	if (foundThreads != numThreads)
+		researchThreads();
+
+	return 0;
 }
 
 int ProcessMonitor::process(uint64_t ts,
@@ -370,7 +409,7 @@ int ProcessMonitor::process(uint64_t ts,
 		cb.mProcessStats(stats);
 
 	// Process threads
-	processThreads(ts, timeDiff, cb);
+	processThreads(ts, timeDiff, rawStats.num_threads, cb);
 
 	return 0;
 }
