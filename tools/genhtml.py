@@ -24,6 +24,9 @@ class SysstatsReader:
 		self.samples = {}
 
 	def __call__(self, name, data):
+		if name == 'acqduration':
+			print('ts %6d - Acquisition took %6d milliseconds' % (data['ts'], data['duration']))
+
 		if name != self.structName:
 			return
 		elif not self.allProcess and data['name'] not in self.processList:

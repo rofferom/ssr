@@ -36,6 +36,7 @@ enum RecordType : uint8_t {
 	RECORD_TYPE_SYS_STATS = 0,
 	RECORD_TYPE_PROCESS_STATS,
 	RECORD_TYPE_THREAD_STATS,
+	RECORD_TYPE_ACQ_DURATION,
 
 	RECORD_TYPE_COUNT
 };
@@ -70,6 +71,7 @@ public:
 	virtual int record(const SystemMonitor::SystemStats &stats) override;
 	virtual int record(const SystemMonitor::ProcessStats &stats) override;
 	virtual int record(const SystemMonitor::ThreadStats &stats) override;
+	virtual int record(const SystemMonitor::AcquisitionDuration &duration) override;
 };
 
 SystemRecorderImpl::SystemRecorderImpl() : SystemRecorder()
@@ -173,6 +175,22 @@ int SystemRecorderImpl::initDescs()
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	mDescList[RECORD_TYPE_THREAD_STATS] = desc;
+	desc = nullptr;
+
+	// Acquisition duration
+	desc = new StructDescInternal();
+	if (!desc)
+		return -ENOMEM;
+
+	desc->mName = "acqduration";
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mDuration, "duration");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	mDescList[RECORD_TYPE_ACQ_DURATION] = desc;
 	desc = nullptr;
 
 	return 0;
@@ -320,6 +338,19 @@ int SystemRecorderImpl::record(const SystemMonitor::ThreadStats &stats)
 	RETURN_IF_WRITE_FAILED(ret);
 
 	ret = mDescList[RECORD_TYPE_THREAD_STATS]->mDesc.writeValue(mSink, &stats);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	return 0;
+}
+
+int SystemRecorderImpl::record(const SystemMonitor::AcquisitionDuration &duration)
+{
+	int ret;
+
+	ret = ValueTrait<uint8_t>::write(mSink, RECORD_TYPE_ACQ_DURATION);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	ret = mDescList[RECORD_TYPE_ACQ_DURATION]->mDesc.writeValue(mSink, &duration);
 	RETURN_IF_WRITE_FAILED(ret);
 
 	return 0;

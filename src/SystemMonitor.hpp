@@ -46,10 +46,16 @@ public:
 		uint16_t    mCpuLoad;
 	};
 
+	struct AcquisitionDuration {
+		uint64_t    mTs;
+		uint64_t    mDuration;
+	};
+
 	struct Callbacks {
 		std::function<void(const SystemStats &)> mSystemStats;
 		std::function<void(const ProcessStats &)> mProcessStats;
 		std::function<void(const ThreadStats &)> mThreadStats;
+		std::function<void(const AcquisitionDuration &)> mAcquisitionDuration;
 	};
 
 public:

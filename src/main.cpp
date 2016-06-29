@@ -174,6 +174,15 @@ int main(int argc, char *argv[])
 			printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
 	};
 
+	cb.mAcquisitionDuration = [recorder] (const SystemMonitor::AcquisitionDuration &duration) {
+		int ret;
+
+		ret = recorder->record(duration);
+		if (ret < 0)
+			printf("recordDuration() failed : %d(%s)\n",
+			       -ret, strerror(-ret));
+	};
+
 	mon = SystemMonitor::create(cb);
 	if (!mon)
 		goto error;

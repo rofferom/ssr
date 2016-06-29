@@ -622,36 +622,74 @@ int SystemMonitorImpl::addProcess(const char *name)
 	return 0;
 }
 
-static int timespecDiff(struct timespec *start, struct timespec *stop)
+static int timespecDiffSec(const struct timespec *start,
+			   const struct timespec *stop)
 {
 	return stop->tv_sec - start->tv_sec;
 }
 
+static uint64_t timespecDiffUs(const struct timespec *start,
+			       const struct timespec *stop)
+{
+	uint64_t ret;
+	struct timespec diff;
+
+	if ((stop->tv_nsec - start->tv_nsec) < 0) {
+		diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
+		diff.tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
+	} else {
+		diff.tv_sec = stop->tv_sec - start->tv_sec;
+		diff.tv_nsec = stop->tv_nsec - start->tv_nsec;
+	}
+
+	ret = diff.tv_sec * 100000;
+	ret += diff.tv_nsec / 1000;
+
+	return ret;
+}
+
 int SystemMonitorImpl::process()
 {
-	struct timespec now;
+	uint64_t ts;
+	struct timespec start;
+	struct timespec end;
 	int timeDiff; // seconds
 	int ret;
 
 	// Compute delay between two calls
-	ret = clock_gettime(CLOCK_MONOTONIC, &now);
+	ret = clock_gettime(CLOCK_MONOTONIC, &start);
 	if (ret < 0) {
 		ret = -errno;
 		printf("clock_gettime() failed : %d(%m)", errno);
 		return ret;
 	}
 
-	timeDiff = timespecDiff(&mLastProcess, &now);
+	timeDiff = timespecDiffSec(&mLastProcess, &start);
 	if (timeDiff == 0) {
 		printf("timespecDiff() returned zero\n");
 		return -EINVAL;
 	}
 
+	ts = (uint64_t) start.tv_sec;
+
 	// Start process monitors
 	for (auto &m :mMonitors)
-		m->process(now.tv_sec, timeDiff, mCb);
+		m->process(ts, timeDiff, mCb);
 
-	mLastProcess = now;
+	mLastProcess = start;
+
+	// Compute acquisition duration
+	ret = clock_gettime(CLOCK_MONOTONIC, &end);
+	if (ret < 0) {
+		ret = -errno;
+		printf("clock_gettime() failed : %d(%m)", errno);
+		return ret;
+	}
+
+	if (mCb.mAcquisitionDuration) {
+		uint64_t duration = timespecDiffUs(&start, &end);
+		mCb.mAcquisitionDuration({ ts, duration } );
+	}
 
 	return 0;
 }
