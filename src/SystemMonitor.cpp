@@ -86,18 +86,17 @@ struct SystemSettings {
 class ProcessMonitor {
 private:
 	struct ThreadInfo {
-		char mPath[128];
+		int mFd;;
 		char mName[64];
 		RawStats mPrevStats;
 	};
 
 private:
+	int mStatFd;
 	int mPid;
 	std::string mName;
 	RawStats mPrevStats;
 	const SystemSettings *mSysSettings;
-
-	bool mFirstProcess;
 
 	std::map<int, ThreadInfo> mThreads;
 
@@ -106,7 +105,7 @@ private:
 
 	int getPidFdCount();
 
-	static int readStats(const char *path, RawStats *procstat);
+	static int readStats(int fd, int pid, RawStats *procstat);
 	static bool testPidName(int pid, const char *name);
 	static int findProcess(const char *name, int *outPid);
 
@@ -127,6 +126,7 @@ private:
 
 public:
 	ProcessMonitor(const char *name, const SystemSettings *sysSettings);
+	~ProcessMonitor();
 
 	int process(uint64_t ts,
 		    int timeDiff,
@@ -136,16 +136,30 @@ public:
 ProcessMonitor::ProcessMonitor(const char *name,
 			       const SystemSettings *sysSettings)
 {
+	mStatFd = -1;
 	mName = name;
 	mPid = INVALID_PID;
 	mSysSettings = sysSettings;
-	mFirstProcess = true;
+}
+
+ProcessMonitor::~ProcessMonitor()
+{
+	clear();
 }
 
 void ProcessMonitor::clear()
 {
+	if (mStatFd != -1) {
+		close(mStatFd);
+		mStatFd = -1;
+	}
+
 	mPid = INVALID_PID;
-	mFirstProcess = true;
+
+	for (auto p : mThreads)
+		close(p.second.mFd);
+
+	mThreads.clear();
 }
 
 uint16_t ProcessMonitor::getCpuLoad(const RawStats &prevStats,
@@ -169,28 +183,40 @@ int ProcessMonitor::processThread(int tid,
 	ThreadInfo *info;
 	SystemMonitor::ThreadStats stats;
 	RawStats rawStats;
+	char path[128];
 	int ret;
 
 	auto thread = mThreads.find(tid);
 	if (thread == mThreads.end()) {
-		ThreadInfo info;
+		ThreadInfo newInfo;
 
 		// Fill thread info
-		snprintf(info.mPath, sizeof(info.mPath),
+		snprintf(path, sizeof(path),
 			 "/proc/%d/task/%d/stat",
 			 mPid, tid);
 
-		ret = readStats(info.mPath, &info.mPrevStats);
-		if (ret < 0)
+		ret = open(path, O_RDONLY|O_CLOEXEC);
+		if (ret == -1) {
+			ret = -errno;
+			printf("Fail to open %s : %d(%m)\n", path, errno);
 			return ret;
+		}
 
-		snprintf(info.mName, sizeof(info.mName),
+		newInfo.mFd = ret;
+
+		ret = readStats(newInfo.mFd, tid, &newInfo.mPrevStats);
+		if (ret < 0) {
+			close(newInfo.mFd);
+			return ret;
+		}
+
+		snprintf(newInfo.mName, sizeof(newInfo.mName),
 			 "%d-%s",
 			 tid,
-			 info.mPrevStats.name);
+			 newInfo.mPrevStats.name);
 
 		// Register thread
-		auto insertRet = mThreads.insert( {tid, info} );
+		auto insertRet = mThreads.insert( {tid, newInfo} );
 		if (!insertRet.second) {
 			printf("Fail to insert thread %d\n", tid);
 			return -EPERM;
@@ -201,9 +227,10 @@ int ProcessMonitor::processThread(int tid,
 
 	info = &thread->second;
 
-	ret = readStats(info->mPath, &rawStats);
+	ret = readStats(info->mFd, tid, &rawStats);
 	if (ret < 0) {
 		// Thread finished
+		close(info->mFd);
 		mThreads.erase(thread);
 		return ret;
 	}
@@ -292,24 +319,28 @@ int ProcessMonitor::process(uint64_t ts,
 		ret = findProcess(mName.c_str(), &mPid);
 		if (ret < 0)
 			return ret;
-	}
 
-	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
+		snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
 
-	if (mFirstProcess) {
-		ret = readStats(path, &mPrevStats);
-		if (ret < 0) {
-			printf("Can't find pid stats '%s'\n", mName.c_str());
+		mStatFd = open(path, O_RDONLY|O_CLOEXEC);
+		if (mStatFd == -1) {
+			ret = -errno;
+			printf("Fail to open %s : %d(%m)\n", path, errno);
 			return ret;
 		}
 
-		mFirstProcess = false;
+		ret = readStats(mStatFd, mPid, &mPrevStats);
+		if (ret < 0) {
+			printf("Can't find pid stats '%s'\n", mName.c_str());
+			clear();
+			return ret;
+		}
 
 		return -EAGAIN;
 	}
 
 	// Get stats
-	ret = readStats(path, &rawStats);
+	ret = readStats(mStatFd, mPid, &rawStats);
 	if (ret < 0) {
 		printf("Can't find pid stats '%s'\n", mName.c_str());
 		clear();
@@ -373,29 +404,18 @@ int ProcessMonitor::getPidFdCount()
 	return count;
 }
 
-int ProcessMonitor::readStats(const char *path, RawStats *procstat)
+int ProcessMonitor::readStats(int fd, int pid, RawStats *procstat)
 {
 	char strstat[1024];
-	int fd;
 	ssize_t readRet;
 	int ret;
 
-	// Read process stats
-	fd = open(path, O_RDONLY|O_CLOEXEC);
-	if (fd == -1) {
-		ret = -errno;
-		printf("Fail to open %s : %d(%m)\n", path, errno);
-		return ret;
-	}
-
-	readRet = read(fd, strstat, sizeof(strstat));
+	readRet = pread(fd, strstat, sizeof(strstat), 0);
 	if (readRet == -1) {
 		ret = -errno;
-		printf("Fail to read %s : %d(%m)", path, errno);
-		goto close_fd;
+		printf("read() failed : %d(%m)", errno);
+		return ret;
 	}
-
-	close(fd);
 
 	// Remove trailing '\n'
 	strstat[readRet - 1] = '\0';
@@ -428,14 +448,12 @@ int ProcessMonitor::readStats(const char *path, RawStats *procstat)
 		     &procstat->rss);
 	if (ret != STAT_PATTERN_COUNT) {
 		ret = -EINVAL;
-		printf("Fail to parse path %s\n", path);
+		printf("Fail to parse stats for pid %d\n", pid);
 		goto error;
 	}
 
 	return 0;
 
-close_fd:
-	close(fd);
 error:
 	return ret;
 
@@ -446,13 +464,23 @@ bool ProcessMonitor::testPidName(int pid, const char *name)
 	RawStats procstat;
 	size_t procNameLen;
 	char path[128];
+	int fd;
 	int ret;
 
 	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
 
-	ret = readStats(path, &procstat);
-	if (ret < 0)
+	fd = open(path, O_RDONLY|O_CLOEXEC);
+	if (fd == -1) {
+		ret = -errno;
+		printf("Fail to open %s : %d(%m)\n", path, errno);
+		return ret;
+	}
+
+	ret = readStats(fd, pid, &procstat);
+	close(fd);
+	if (ret < 0) {
 		return false;
+	}
 
 	procNameLen = strlen(procstat.name);
 	if (procNameLen == 0) {
