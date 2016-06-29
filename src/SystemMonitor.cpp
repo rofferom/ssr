@@ -359,7 +359,10 @@ int ProcessMonitor::process(uint64_t ts,
 	stats.mVsize = rawStats.vsize / 1024;
 	stats.mRss = rawStats.rss * mSysSettings->mPagesize / 1024;
 	stats.mThreadCount = rawStats.num_threads;
-	stats.mFdCount = getPidFdCount();
+
+	// Disable fd count. Should be disabled by default and activable
+	// by user.
+	// stats.mFdCount = getPidFdCount();
 
 	mPrevStats = rawStats;
 
