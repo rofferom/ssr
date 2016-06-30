@@ -25,7 +25,7 @@ class SysstatsReader:
 
 	def __call__(self, name, data):
 		if name == 'acqduration':
-			print('ts %6d - Acquisition took %6d milliseconds' % (data['ts'], data['duration']))
+			print('ts %6d - Acquisition took %6d us' % (data['ts'], data['duration']))
 
 		if name != self.structName:
 			return
