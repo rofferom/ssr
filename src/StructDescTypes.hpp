@@ -102,7 +102,7 @@ struct ValueTrait<uint64_t> {
 
 	static ssize_t write(ISink *sink, const uint64_t &i)
 	{
-		uint64_t v = ((uint64_t) htonl(i & 0xFFFFF) << 32) | htonl(i >> 32);
+		uint64_t v = ((uint64_t) htonl(i & 0xFFFFFFFF) << 32) | htonl(i >> 32);
 
 		return sink->write(&v, sizeof(v));
 	}
@@ -115,7 +115,7 @@ struct ValueTrait<int64_t> {
 	static ssize_t write(ISink *sink, const int64_t &i)
 	{
 		uint64_t *t = (uint64_t *) &i;
-		uint64_t v = ((uint64_t) htonl(*t & 0xFFFFF) << 32) | htonl(*t >> 32);
+		uint64_t v = ((uint64_t) htonl(*t & 0xFFFFFFFF) << 32) | htonl(*t >> 32);
 
 		return sink->write(&v, sizeof(v));
 	}
