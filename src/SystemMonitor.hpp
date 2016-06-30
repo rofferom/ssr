@@ -54,8 +54,8 @@ public:
 	};
 
 	struct AcquisitionDuration {
-		uint64_t    mTs;
-		uint64_t    mDuration;
+		uint64_t    mStart;
+		uint64_t    mEnd;
 	};
 
 	struct Callbacks {

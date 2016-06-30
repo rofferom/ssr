@@ -79,7 +79,7 @@ struct RawStats {
 };
 
 struct SystemSettings {
-	int mHertz;
+	int mClkTck;
 	int mPagesize ;
 };
 
@@ -113,7 +113,7 @@ private:
 	static uint16_t getCpuLoad(const RawStats &prevStats,
 				   const RawStats &curStats,
 				   const SystemSettings *sysSettings,
-				   int timeDiff);
+				   uint64_t timeDiffUs);
 
 
 	int processThread(ThreadInfo *info,
@@ -135,7 +135,7 @@ public:
 	~ProcessMonitor();
 
 	int process(uint64_t ts,
-		    int timeDiff,
+		    uint64_t timeDiff,
 		    const SystemMonitor::Callbacks &cb);
 };
 
@@ -171,14 +171,18 @@ void ProcessMonitor::clear()
 uint16_t ProcessMonitor::getCpuLoad(const RawStats &prevStats,
 				    const RawStats &curStats,
 				    const SystemSettings *sysSettings,
-				    int timeDiff)
+				    uint64_t timeDiffUs)
 {
-	long int spentTime;
+	uint64_t ticks;
+	double cpuload;
 
-	spentTime  = curStats.utime + curStats.stime;
-	spentTime -= prevStats.utime + prevStats.stime;
+	ticks  = curStats.utime + curStats.stime;
+	ticks -= prevStats.utime + prevStats.stime;
 
-	return (100 * spentTime) / (sysSettings->mHertz * timeDiff);
+	cpuload  = (double) ticks / (double) sysSettings->mClkTck;
+	cpuload /= (double) timeDiffUs / 1000000.0;
+
+	return cpuload * 100;
 }
 
 int ProcessMonitor::processThread(ThreadInfo *info,
@@ -348,7 +352,7 @@ int ProcessMonitor::processThreads(uint64_t ts,
 }
 
 int ProcessMonitor::process(uint64_t ts,
-			    int timeDiff,
+			    uint64_t timeDiff,
 			    const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ProcessStats stats;
@@ -585,7 +589,7 @@ private:
 	Callbacks mCb;
 	SystemSettings mSysSettings;
 	std::list<ProcessMonitor *> mMonitors;
-	struct timespec mLastProcess;
+	uint64_t mLastProcess;
 
 public:
 	SystemMonitorImpl(const Callbacks &cb);
@@ -598,10 +602,9 @@ public:
 SystemMonitorImpl::SystemMonitorImpl(const Callbacks &cb) : SystemMonitor()
 {
 	mCb = cb;
-	mSysSettings.mHertz = sysconf(_SC_CLK_TCK);
+	mSysSettings.mClkTck = sysconf(_SC_CLK_TCK);
 	mSysSettings.mPagesize = getpagesize();
-	mLastProcess.tv_sec = 0;
-	mLastProcess.tv_nsec = 0;
+	mLastProcess = 0;
 }
 
 SystemMonitorImpl::~SystemMonitorImpl()
@@ -626,74 +629,47 @@ int SystemMonitorImpl::addProcess(const char *name)
 	return 0;
 }
 
-static int timespecDiffSec(const struct timespec *start,
-			   const struct timespec *stop)
+static int getTimeUs(uint64_t *us)
 {
-	return stop->tv_sec - start->tv_sec;
-}
+	struct timespec ts;
+	int ret;
 
-static uint64_t timespecDiffUs(const struct timespec *start,
-			       const struct timespec *stop)
-{
-	uint64_t ret;
-	struct timespec diff;
-
-	if ((stop->tv_nsec - start->tv_nsec) < 0) {
-		diff.tv_sec = stop->tv_sec - start->tv_sec - 1;
-		diff.tv_nsec = stop->tv_nsec - start->tv_nsec + 1000000000;
-	} else {
-		diff.tv_sec = stop->tv_sec - start->tv_sec;
-		diff.tv_nsec = stop->tv_nsec - start->tv_nsec;
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0) {
+		ret = -errno;
+		printf("clock_gettime() failed : %d(%m)", errno);
+		return ret;
 	}
 
-	ret = diff.tv_sec * 100000;
-	ret += diff.tv_nsec / 1000;
+	*us = ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000UL;
 
-	return ret;
+	return 0;
 }
 
 int SystemMonitorImpl::process()
 {
-	uint64_t ts;
-	struct timespec start;
-	struct timespec end;
-	int timeDiff; // seconds
+	uint64_t start = 0;
+	uint64_t end = 0;
 	int ret;
 
 	// Compute delay between two calls
-	ret = clock_gettime(CLOCK_MONOTONIC, &start);
-	if (ret < 0) {
-		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
+	ret = getTimeUs(&start);
+	if (ret < 0)
 		return ret;
-	}
-
-	timeDiff = timespecDiffSec(&mLastProcess, &start);
-	if (timeDiff == 0) {
-		printf("timespecDiff() returned zero\n");
-		return -EINVAL;
-	}
-
-	ts = (uint64_t) start.tv_sec;
 
 	// Start process monitors
 	for (auto &m :mMonitors)
-		m->process(ts, timeDiff, mCb);
-
-	mLastProcess = start;
+		m->process(start, start - mLastProcess, mCb);
 
 	// Compute acquisition duration
-	ret = clock_gettime(CLOCK_MONOTONIC, &end);
-	if (ret < 0) {
-		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
+	ret = getTimeUs(&end);
+	if (ret < 0)
 		return ret;
-	}
 
-	if (mCb.mAcquisitionDuration) {
-		uint64_t duration = timespecDiffUs(&start, &end);
-		mCb.mAcquisitionDuration({ ts, duration } );
-	}
+	if (mCb.mAcquisitionDuration)
+		mCb.mAcquisitionDuration( { start, end } );
+
+	mLastProcess = start;
 
 	return 0;
 }

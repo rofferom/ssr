@@ -196,10 +196,10 @@ int SystemRecorderImpl::initDescs()
 
 	desc->mName = "acqduration";
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mTs, "ts");
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mStart, "start");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mDuration, "duration");
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::AcquisitionDuration, mEnd, "end");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	mDescList[RECORD_TYPE_ACQ_DURATION] = desc;
