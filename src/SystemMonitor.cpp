@@ -202,6 +202,8 @@ int ProcessMonitor::processThread(ThreadInfo *info,
 	stats.mPid = mPid;
 	stats.mTid = info->mTid;
 	stats.mName = info->mName;
+	stats.mUtime = rawStats.utime;
+	stats.mStime = rawStats.stime;
 
 	stats.mCpuLoad = getCpuLoad(info->mPrevStats,
 				    rawStats,
@@ -389,6 +391,8 @@ int ProcessMonitor::process(uint64_t ts,
 	stats.mTs = ts;
 	stats.mPid = mPid;
 	stats.mName = mName.c_str();
+	stats.mUtime = rawStats.utime;
+	stats.mStime = rawStats.stime;
 
 	stats.mCpuLoad = getCpuLoad(mPrevStats,
 				    rawStats,

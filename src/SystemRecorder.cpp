@@ -149,6 +149,12 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mFdCount, "fdcount");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mUtime, "utime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mStime, "stime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	mDescList[RECORD_TYPE_PROCESS_STATS] = desc;
 	desc = nullptr;
 
@@ -172,6 +178,12 @@ int SystemRecorderImpl::initDescs()
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mCpuLoad, "cpuload");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mUtime, "utime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mStime, "stime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	mDescList[RECORD_TYPE_THREAD_STATS] = desc;

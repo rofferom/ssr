@@ -25,6 +25,9 @@ public:
 		uint16_t    mThreadCount;
 		uint16_t    mFdCount;
 
+		uint64_t    mUtime;
+		uint64_t    mStime;
+
 		ProcessStats()
 		{
 			mTs = 0;
@@ -35,6 +38,8 @@ public:
 			mRss = 0;
 			mThreadCount = 0;
 			mFdCount = 0;
+			mUtime = 0;
+			mStime = 0;
 		}
 	};
 
@@ -44,6 +49,8 @@ public:
 		uint32_t    mTid;
 		const char *mName;
 		uint16_t    mCpuLoad;
+		uint64_t    mUtime;
+		uint64_t    mStime;
 	};
 
 	struct AcquisitionDuration {
