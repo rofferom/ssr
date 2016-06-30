@@ -24,7 +24,7 @@ public:
 	{
 	}
 
-	virtual ssize_t write(const void *buff, size_t size) override
+	virtual ssize_t write(const void *buff, size_t size)
 	{
 		return fwrite(buff, size, 1, mFile);
 	}

@@ -5,25 +5,41 @@
 #include <getopt.h>
 #include <signal.h>
 #include <poll.h>
+#include <unistd.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+
+#include <string>
+
 #include "SystemRecorder.hpp"
 #include "SystemMonitor.hpp"
 
-#include <unistd.h>
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
 static struct Context {
-	bool stop = false;
-	int stopfd = -1;
-	int timer = -1;
+	bool stop;
+	int stopfd;
+	int timer;
+
+	Context()
+	{
+		stop = false;
+		stopfd = -1;
+		timer = -1;
+	}
 } ctx;
 
 struct Params {
-	bool help = false;
+	bool help;
 	std::string output;
-	int period = 1;
+	int period;
+
+	Params()
+	{
+		help = false;
+		period = 1;
+	}
 };
 
 static const struct option argsOptions[] = {

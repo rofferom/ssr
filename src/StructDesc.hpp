@@ -1,6 +1,7 @@
 #ifndef __STRUCTDESC_HPP__
 #define __STRUCTDESC_HPP__
 
+#include <string>
 #include <memory>
 #include "FileSink.hpp"
 #include "StructDescTypes.hpp"
@@ -41,8 +42,9 @@ private:
 		}
 	};
 
-	template <typename T>
-	using EnumType = typename std::underlying_type<T>::type;
+//	TODO : try to restore this for gcc versions >= 4.7
+//	template <typename T>
+//	using EnumType = typename std::underlying_type<T>::type;
 
 private:
 	std::list<EntryDesc *> mEntryDescList;
@@ -69,10 +71,10 @@ public:
 		desc->mDescWriter = [desc] (ISink *sink) -> ssize_t {
 			ValueTrait<std::string>::write(sink, desc->mName);
 
-			EnumType<EntryType> type = EntryType::ENTRY_TYPE_RAWVALUE;
+			uint8_t type = EntryType::ENTRY_TYPE_RAWVALUE;
 			ValueTrait<uint8_t>::write(sink, type);
 
-			EnumType<RawValueType> rawType = ValueTrait<T>::type;
+			uint8_t rawType = ValueTrait<T>::type;
 			ValueTrait<uint8_t>::write(sink, rawType);
 
 			return 0;
@@ -100,7 +102,7 @@ public:
 		desc->mDescWriter = [desc, structDesc] (ISink *sink) -> ssize_t {
 			ValueTrait<std::string>::write(sink, desc->mName);
 
-			EnumType<EntryType> type = EntryType::ENTRY_TYPE_STRUCT;
+			uint8_t type = EntryType::ENTRY_TYPE_STRUCT;
 			ValueTrait<uint8_t>::write(sink, type);
 
 			uint32_t entryCount = (uint32_t) structDesc->mEntryDescList.size();
@@ -136,7 +138,7 @@ public:
 		desc->mDescWriter = [desc, itemDesc] (ISink *sink) -> ssize_t {
 			ValueTrait<std::string>::write(sink, desc->mName);
 
-			EnumType<EntryType> type = EntryType::ENTRY_TYPE_LIST;
+			uint8_t type = EntryType::ENTRY_TYPE_LIST;
 			ValueTrait<uint8_t>::write(sink, type);
 
 			uint32_t entryCount = (uint32_t) itemDesc->mEntryDescList.size();

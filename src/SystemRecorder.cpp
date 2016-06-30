@@ -63,15 +63,15 @@ public:
 	SystemRecorderImpl();
 	virtual ~SystemRecorderImpl();
 
-	virtual int open(const char *path) override;
-	virtual int close() override;
+	virtual int open(const char *path);
+	virtual int close();
 
-	virtual int flush() override;
+	virtual int flush();
 
-	virtual int record(const SystemMonitor::SystemStats &stats) override;
-	virtual int record(const SystemMonitor::ProcessStats &stats) override;
-	virtual int record(const SystemMonitor::ThreadStats &stats) override;
-	virtual int record(const SystemMonitor::AcquisitionDuration &duration) override;
+	virtual int record(const SystemMonitor::SystemStats &stats);
+	virtual int record(const SystemMonitor::ProcessStats &stats);
+	virtual int record(const SystemMonitor::ThreadStats &stats);
+	virtual int record(const SystemMonitor::AcquisitionDuration &duration);
 };
 
 SystemRecorderImpl::SystemRecorderImpl() : SystemRecorder()

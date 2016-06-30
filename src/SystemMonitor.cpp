@@ -587,8 +587,8 @@ public:
 	SystemMonitorImpl(const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
 
-	virtual int addProcess(const char *name) override;
-	virtual int process() override;
+	virtual int addProcess(const char *name);
+	virtual int process();
 };
 
 SystemMonitorImpl::SystemMonitorImpl(const Callbacks &cb) : SystemMonitor()
