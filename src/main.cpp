@@ -271,11 +271,11 @@ int main(int argc, char *argv[])
 		if (fds[1].events & POLLIN) {
 			uint64_t expirations;
 
+			mon->process();
+
 			ret = read(fds[1].fd, &expirations, sizeof(expirations));
 			if (ret < 0)
 				printf("read() failed : %d(%m)\n", errno);
-
-			mon->process();
 		}
 	}
 
