@@ -290,6 +290,7 @@ int SystemRecorderImpl::close()
 	if (!mFile)
 		return -EPERM;
 
+	mSink->flush();
 	delete mSink;
 	mSink = nullptr;
 
