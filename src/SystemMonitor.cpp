@@ -381,6 +381,8 @@ int ProcessMonitor::process(uint64_t ts,
 			return ret;
 		}
 
+		researchThreads();
+
 		return -EAGAIN;
 	}
 
