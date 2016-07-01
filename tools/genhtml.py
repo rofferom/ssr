@@ -23,9 +23,20 @@ class SysstatsReader:
 		self.structName = structName
 		self.samples = {}
 
+		self.totalAcqTime = 0
+		self.ignoredCount = 0
+		self.sampleCount = 0
+
 	def __call__(self, name, data):
 		if name == 'acqduration':
-			print('ts %u - Acquisition took %6u us' % (data['start'], data['end'] - data['start']))
+			acqTime = data['end'] - data['start']
+			print('ts %u - Acquisition took %6u us' % (data['start'], acqTime))
+
+			if self.ignoredCount < 2:
+				self.ignoredCount += 1
+			else:
+				self.totalAcqTime += acqTime
+				self.sampleCount += 1
 
 		if name != self.structName:
 			return
@@ -46,6 +57,13 @@ class SysstatsReader:
 
 	def getProcessList(self):
 		return self.processList
+
+	def printStats(self):
+		print('Average acquisition time : %d us' % (self.totalAcqTime / self.sampleCount))
+		print('%d threads' % len(self.processList))
+
+		for name in self.processList:
+			print('\t%s' % name)
 
 	def getSamples(self):
 		ret = []
@@ -102,4 +120,6 @@ if __name__ == '__main__':
 		# Write output file
 		out = open(args.output, 'w')
 		out.write(html)
+
+		reader.printStats()
 
