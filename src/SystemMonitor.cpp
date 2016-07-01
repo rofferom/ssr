@@ -428,6 +428,23 @@ int ProcessMonitor::getPidFdCount()
 	return count;
 }
 
+static int getTimeNs(uint64_t *ns)
+{
+	struct timespec ts;
+	int ret;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0) {
+		ret = -errno;
+		printf("clock_gettime() failed : %d(%m)", errno);
+		return ret;
+	}
+
+	*ns = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+	return 0;
+}
+
 int ProcessMonitor::readStats(int fd, int pid, RawStats *procstat)
 {
 	char strstat[1024];
@@ -593,23 +610,6 @@ int SystemMonitorImpl::addProcess(const char *name)
 	return 0;
 }
 
-static int getTimeUs(uint64_t *us)
-{
-	struct timespec ts;
-	int ret;
-
-	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
-	if (ret < 0) {
-		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
-		return ret;
-	}
-
-	*us = ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000UL;
-
-	return 0;
-}
-
 int SystemMonitorImpl::process()
 {
 	uint64_t start = 0;
@@ -617,7 +617,7 @@ int SystemMonitorImpl::process()
 	int ret;
 
 	// Compute delay between two calls
-	ret = getTimeUs(&start);
+	ret = getTimeNs(&start);
 	if (ret < 0)
 		return ret;
 
@@ -626,7 +626,7 @@ int SystemMonitorImpl::process()
 		m->process(start, start - mLastProcess, mCb);
 
 	// Compute acquisition duration
-	ret = getTimeUs(&end);
+	ret = getTimeNs(&end);
 	if (ret < 0)
 		return ret;
 
