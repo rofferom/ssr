@@ -18,7 +18,7 @@ namespace {
 #define INVALID_PID -1
 
 #define STAT_PATTERN \
-	"%d %128s %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld %ld "\
+	"%d (%128[^)]) %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld %ld "\
 	"%ld %ld %llu %lu %ld"
 
 #define STAT_PATTERN_COUNT 24
@@ -512,7 +512,6 @@ error:
 bool ProcessMonitor::testPidName(int pid, const char *name)
 {
 	RawStats procstat;
-	size_t procNameLen;
 	char path[128];
 	int fd;
 	int ret;
@@ -531,16 +530,7 @@ bool ProcessMonitor::testPidName(int pid, const char *name)
 	if (ret < 0) {
 		return false;
 	}
-
-	procNameLen = strlen(procstat.name);
-	if (procNameLen == 0) {
-		printf("Got an empty process name for pid %d\n", pid);
-		return false;
-	}
-
-	// Compare but exclude first and last caracter.
-	// procfs give name like '(<processname>)'
-	return (strncmp(name, procstat.name + 1, procNameLen - 2)) == 0;
+	return strcmp(name, procstat.name) == 0;
 }
 
 int ProcessMonitor::findProcess(const char *name, int *outPid)
