@@ -48,34 +48,6 @@ struct RawStats {
 	unsigned long long int starttime;
 	unsigned long int vsize;
 	long int rss;
-
-	RawStats()
-	{
-		pid = 0;
-		name[0] = '\0';
-		state = 0;
-		ppid = 0;
-		pgrp = 0;
-		session = 0;
-		tty_nr = 0;
-		tpgid = 0;
-		flags = 0;
-		minflt = 0;
-		cminflt = 0;
-		majflt = 0;
-		cmajflt = 0;
-		utime = 0;
-		stime = 0;
-		cutime = 0;
-		cstime = 0;
-		priority = 0;
-		nice = 0;
-		num_threads = 0;
-		itrealvalue = 0;
-		starttime = 0;
-		vsize = 0;
-		rss = 0;
-	}
 };
 
 struct SystemSettings {

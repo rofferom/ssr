@@ -27,20 +27,6 @@ public:
 
 		uint64_t    mUtime;
 		uint64_t    mStime;
-
-		ProcessStats()
-		{
-			mTs = 0;
-			mPid = 0;
-			mName = nullptr;
-			mCpuLoad = 0;
-			mVsize = 0;
-			mRss = 0;
-			mThreadCount = 0;
-			mFdCount = 0;
-			mUtime = 0;
-			mStime = 0;
-		}
 	};
 
 	struct ThreadStats {
