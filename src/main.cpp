@@ -172,6 +172,7 @@ int main(int argc, char *argv[])
 	struct itimerspec timer;
 	struct pollfd fds[2];
 	Params params;
+	SystemMonitor::SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
 	SystemMonitor *mon = nullptr;
 	SystemRecorder *recorder = nullptr;
@@ -227,6 +228,15 @@ int main(int argc, char *argv[])
 		}
 
 	}
+
+	// Write system config
+	ret = mon->readSystemConfig(&systemConfig);
+	if (ret < 0) {
+		printf("readSystemConfig() failed : %d(%m)\n", errno);
+		goto error;
+	}
+
+	recorder->record(systemConfig);
 
 	// Create stopfd
 	ret = eventfd(0, EFD_CLOEXEC);

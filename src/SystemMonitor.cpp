@@ -82,12 +82,6 @@ private:
 	static bool testPidName(int pid, const char *name);
 	static int findProcess(const char *name, int *outPid);
 
-	static uint16_t getCpuLoad(const RawStats &prevStats,
-				   const RawStats &curStats,
-				   const SystemSettings *sysSettings,
-				   uint64_t timeDiffUs);
-
-
 	int processThread(ThreadInfo *info,
 			  uint64_t ts,
 			  int timeDiff,
@@ -140,23 +134,6 @@ void ProcessMonitor::clear()
 	mThreads.clear();
 }
 
-uint16_t ProcessMonitor::getCpuLoad(const RawStats &prevStats,
-				    const RawStats &curStats,
-				    const SystemSettings *sysSettings,
-				    uint64_t timeDiffUs)
-{
-	uint64_t ticks;
-	double cpuload;
-
-	ticks  = curStats.utime + curStats.stime;
-	ticks -= prevStats.utime + prevStats.stime;
-
-	cpuload  = (double) ticks / (double) sysSettings->mClkTck;
-	cpuload /= (double) timeDiffUs / 1000000.0;
-
-	return cpuload * 100;
-}
-
 int ProcessMonitor::processThread(ThreadInfo *info,
 				  uint64_t ts,
 				  int timeDiff,
@@ -180,11 +157,6 @@ int ProcessMonitor::processThread(ThreadInfo *info,
 	stats.mName = info->mName;
 	stats.mUtime = rawStats.utime;
 	stats.mStime = rawStats.stime;
-
-	stats.mCpuLoad = getCpuLoad(info->mPrevStats,
-				    rawStats,
-				    mSysSettings,
-				    timeDiff);
 
 	info->mPrevStats = rawStats;
 
@@ -371,11 +343,6 @@ int ProcessMonitor::process(uint64_t ts,
 	stats.mName = mName.c_str();
 	stats.mUtime = rawStats.utime;
 	stats.mStime = rawStats.stime;
-
-	stats.mCpuLoad = getCpuLoad(mPrevStats,
-				    rawStats,
-				    mSysSettings,
-				    timeDiff);
 
 	stats.mVsize = rawStats.vsize / 1024;
 	stats.mRss = rawStats.rss * mSysSettings->mPagesize / 1024;
@@ -576,6 +543,7 @@ public:
 	SystemMonitorImpl(const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
 
+	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
 	virtual int process();
 };
@@ -592,6 +560,16 @@ SystemMonitorImpl::~SystemMonitorImpl()
 {
 	for (auto &m :mMonitors)
 		delete m;
+}
+
+int SystemMonitorImpl::readSystemConfig(SystemConfig *config)
+{
+	if (!config)
+		return -EINVAL;
+
+	config->mClkTck = mSysSettings.mClkTck;
+
+	return 0;
 }
 
 int SystemMonitorImpl::addProcess(const char *name)

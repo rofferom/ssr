@@ -23,11 +23,19 @@ class SysstatsReader:
 		self.structName = structName
 		self.samples = {}
 
+		self.clkTck = 0
+
 		self.totalAcqTime = 0
 		self.ignoredCount = 0
 		self.sampleCount = 0
 
+		self.lastSamples = {}
+
 	def __call__(self, name, data):
+		if name == 'systemconfig':
+			self.clkTck = data['clktck']
+			return
+
 		if name == 'acqduration':
 			acqTime = data['end'] - data['start']
 			print('ts %u - Acquisition took %6u us' % (data['start'], acqTime))
@@ -38,6 +46,8 @@ class SysstatsReader:
 				self.totalAcqTime += acqTime
 				self.sampleCount += 1
 
+			return
+
 		if name != self.structName:
 			return
 		elif not self.allProcess and data['name'] not in self.processList:
@@ -46,6 +56,12 @@ class SysstatsReader:
 		if self.allProcess and data['name'] not in self.processList:
 			self.processList.append(data['name'])
 
+		try:
+			lastSample = self.lastSamples[data['name']]
+		except:
+			self.lastSamples[data['name']] = data
+			return
+
 		ts = data['ts']
 		try:
 			sample = self.samples[ts]
@@ -53,7 +69,21 @@ class SysstatsReader:
 			sample = { 'ts': ts }
 			self.samples[ts] = sample
 
-		sample[data['name']] = data[self.sampleName]
+		if self.sampleName == 'cpuload':
+			ticks = data['utime'] + data['stime']
+			ticks -= lastSample['utime'] + lastSample['stime']
+
+			timeDiff = data['ts'] - lastSample['ts']
+
+			cpuload = float(ticks) / float(self.clkTck)
+			cpuload /= float(timeDiff) / 1000000000.0
+			cpuload *= 100
+
+			sample[data['name']] = cpuload
+		else:
+			sample[data['name']] = data[self.sampleName]
+
+		self.lastSamples[data['name']] = data
 
 	def getProcessList(self):
 		return self.processList

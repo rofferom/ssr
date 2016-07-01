@@ -8,6 +8,10 @@
 
 class SystemMonitor {
 public:
+	struct SystemConfig {
+		int32_t mClkTck;
+	};
+
 	struct SystemStats {
 		uint64_t mTs;
 		uint32_t mCpuLoad;
@@ -19,7 +23,6 @@ public:
 		uint64_t    mTs;
 		uint32_t    mPid;
 		const char *mName;
-		uint16_t    mCpuLoad;
 		uint32_t    mVsize; // kbytes
 		uint32_t    mRss; // kbytes
 		uint16_t    mThreadCount;
@@ -35,6 +38,7 @@ public:
 		uint32_t    mTid;
 		const char *mName;
 		uint16_t    mCpuLoad;
+
 		uint64_t    mUtime;
 		uint64_t    mStime;
 	};
@@ -55,6 +59,8 @@ public:
 
 public:
 	virtual ~SystemMonitor() {}
+
+	virtual int readSystemConfig(SystemConfig *config) = 0;
 
 	virtual int addProcess(const char *name) = 0;
 	virtual int process() = 0;

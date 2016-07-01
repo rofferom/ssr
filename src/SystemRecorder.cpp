@@ -33,7 +33,8 @@ namespace {
  */
 
 enum RecordType : uint8_t {
-	RECORD_TYPE_SYS_STATS = 0,
+	RECORD_TYPE_SYS_CONFIG = 0,
+	RECORD_TYPE_SYS_STATS,
 	RECORD_TYPE_PROCESS_STATS,
 	RECORD_TYPE_THREAD_STATS,
 	RECORD_TYPE_ACQ_DURATION,
@@ -68,6 +69,7 @@ public:
 
 	virtual int flush();
 
+	virtual int record(const SystemMonitor::SystemConfig &config);
 	virtual int record(const SystemMonitor::SystemStats &stats);
 	virtual int record(const SystemMonitor::ProcessStats &stats);
 	virtual int record(const SystemMonitor::ThreadStats &stats);
@@ -95,6 +97,20 @@ int SystemRecorderImpl::initDescs()
 {
 	StructDescInternal *desc;
 	int ret;
+
+	// SystemConfig
+	desc = new StructDescInternal();
+	if (!desc)
+		return -ENOMEM;
+
+	desc->mName = "systemconfig";
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemConfig, mClkTck, "clktck");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	mDescList[RECORD_TYPE_SYS_CONFIG] = desc;
+	desc = nullptr;
+
 
 	// SystemStats
 	desc = new StructDescInternal();
@@ -132,9 +148,6 @@ int SystemRecorderImpl::initDescs()
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mName, "name");
-	RETURN_IF_REGISTER_FAILED(ret);
-
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mCpuLoad, "cpuload");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mVsize, "vsize");
@@ -313,6 +326,19 @@ int SystemRecorderImpl::flush()
 		printf("fflush() failed : %d(%m)\n", errno);
 		return ret;
 	}
+
+	return 0;
+}
+
+int SystemRecorderImpl::record(const SystemMonitor::SystemConfig &config)
+{
+	int ret;
+
+	ret = ValueTrait<uint8_t>::write(mSink, RECORD_TYPE_SYS_CONFIG);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	ret = mDescList[RECORD_TYPE_SYS_CONFIG]->mDesc.writeValue(mSink, &config);
+	RETURN_IF_WRITE_FAILED(ret);
 
 	return 0;
 }
