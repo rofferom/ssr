@@ -131,6 +131,42 @@ static void sighandler(int s)
 		printf("write() failed : %d(%m)\n", errno);
 }
 
+static void processStatsCb(
+		const SystemMonitor::ProcessStats &stats,
+		void *userdata)
+{
+	SystemRecorder *recorder = (SystemRecorder *) userdata;
+	int ret;
+
+	ret = recorder->record(stats);
+	if (ret < 0)
+		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+}
+
+static void threadStatsCb(
+		const SystemMonitor::ThreadStats &stats,
+		void *userdata)
+{
+	SystemRecorder *recorder = (SystemRecorder *) userdata;
+	int ret;
+
+	ret = recorder->record(stats);
+	if (ret < 0)
+		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+}
+
+static void acquisitionDurationCb(
+		const SystemMonitor::AcquisitionDuration &stats,
+		void *userdata)
+{
+	SystemRecorder *recorder = (SystemRecorder *) userdata;
+	int ret;
+
+	ret = recorder->record(stats);
+	if (ret < 0)
+		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+}
+
 int main(int argc, char *argv[])
 {
 	struct itimerspec timer;
@@ -174,30 +210,10 @@ int main(int argc, char *argv[])
 	}
 
 	// Create monitor
-	cb.mProcessStats = [recorder] (const SystemMonitor::ProcessStats &stats) {
-		int ret;
-
-		ret = recorder->record(stats);
-		if (ret < 0)
-			printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
-	};
-
-	cb.mThreadStats = [recorder] (const SystemMonitor::ThreadStats &stats) {
-		int ret;
-
-		ret = recorder->record(stats);
-		if (ret < 0)
-			printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
-	};
-
-	cb.mAcquisitionDuration = [recorder] (const SystemMonitor::AcquisitionDuration &duration) {
-		int ret;
-
-		ret = recorder->record(duration);
-		if (ret < 0)
-			printf("recordDuration() failed : %d(%s)\n",
-			       -ret, strerror(-ret));
-	};
+	cb.mProcessStats = processStatsCb;
+	cb.mThreadStats = threadStatsCb;
+	cb.mAcquisitionDuration = acquisitionDurationCb;
+	cb.mUserdata = recorder;
 
 	mon = SystemMonitor::create(cb);
 	if (!mon)

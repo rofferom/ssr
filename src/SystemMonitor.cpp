@@ -217,7 +217,7 @@ int ProcessMonitor::processThread(ThreadInfo *info,
 	info->mPrevStats = rawStats;
 
 	if (cb.mThreadStats)
-		cb.mThreadStats(stats);
+		cb.mThreadStats(stats, cb.mUserdata);
 
 	return 0;
 }
@@ -414,7 +414,7 @@ int ProcessMonitor::process(uint64_t ts,
 	mPrevStats = rawStats;
 
 	if (cb.mProcessStats)
-		cb.mProcessStats(stats);
+		cb.mProcessStats(stats, cb.mUserdata);
 
 	// Process threads
 	processThreads(ts, timeDiff, rawStats.num_threads, cb);
@@ -667,7 +667,7 @@ int SystemMonitorImpl::process()
 		return ret;
 
 	if (mCb.mAcquisitionDuration)
-		mCb.mAcquisitionDuration( { start, end } );
+		mCb.mAcquisitionDuration( { start, end }, mCb.mUserdata);
 
 	mLastProcess = start;
 
