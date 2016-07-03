@@ -50,13 +50,11 @@ private:
 			    const SystemMonitor::Callbacks &cb);
 
 	int processThreads(uint64_t ts,
-			   int timeDiff,
 			   long int numThreads,
 			   const SystemMonitor::Callbacks &cb);
 
 	int readThreadStats(ThreadInfo *info,
 			    uint64_t ts,
-			    int timeDiff,
 			    const SystemMonitor::Callbacks &cb);
 
 	int readProcessStats(uint64_t ts,
@@ -67,9 +65,7 @@ public:
 	ProcessMonitor(const char *name, const SystemSettings *sysSettings);
 	~ProcessMonitor();
 
-	int process(uint64_t ts,
-		    uint64_t timeDiff,
-		    const SystemMonitor::Callbacks &cb);
+	int process(uint64_t ts, const SystemMonitor::Callbacks &cb);
 };
 
 ProcessMonitor::ProcessMonitor(const char *name,
@@ -216,7 +212,6 @@ closedir:
 
 int ProcessMonitor::readThreadStats(ThreadInfo *info,
 				    uint64_t ts,
-				    int timeDiff,
 				    const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ThreadStats stats;
@@ -265,7 +260,6 @@ int ProcessMonitor::readProcessStats(uint64_t ts,
 }
 
 int ProcessMonitor::processThreads(uint64_t ts,
-				   int timeDiff,
 				   long int numThreads,
 				   const SystemMonitor::Callbacks &cb)
 {
@@ -277,7 +271,7 @@ int ProcessMonitor::processThreads(uint64_t ts,
 	for (auto it = mThreads.begin(); it != mThreads.end(); it++) {
 		ThreadInfo *info = &it->second;
 
-		ret = readThreadStats(info, ts, timeDiff, cb);
+		ret = readThreadStats(info, ts, cb);
 		if (ret < 0) {
 			printf("Fail to process thread %d\n", info->mTid);
 			close(info->mFd);
@@ -299,9 +293,7 @@ int ProcessMonitor::processThreads(uint64_t ts,
 	return 0;
 }
 
-int ProcessMonitor::process(uint64_t ts,
-			    uint64_t timeDiff,
-			    const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::process(uint64_t ts, const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ProcessStats stats;
 	int ret;
@@ -331,7 +323,7 @@ int ProcessMonitor::process(uint64_t ts,
 	}
 
 	// Process threads
-	processThreads(ts, timeDiff, stats.mThreadCount, cb);
+	processThreads(ts, stats.mThreadCount, cb);
 
 	return 0;
 }
@@ -454,7 +446,7 @@ int SystemMonitorImpl::process()
 
 	// Start process monitors
 	for (auto &m :mMonitors)
-		m->process(start, start - mLastProcess, mCb);
+		m->process(start, mCb);
 
 	// Compute acquisition duration
 	ret = getTimeNs(&end);
