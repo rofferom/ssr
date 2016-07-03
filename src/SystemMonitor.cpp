@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -12,43 +11,11 @@
 #include <map>
 
 #include "SystemMonitor.hpp"
+#include "ProcFsTools.hpp"
 
 namespace {
 
 #define INVALID_PID -1
-
-#define STAT_PATTERN \
-	"%d (%128[^)]) %c %d %d %d %d %d %u %lu %lu %lu %lu %lu %lu %ld %ld %ld %ld "\
-	"%ld %ld %llu %lu %ld"
-
-#define STAT_PATTERN_COUNT 24
-
-struct RawStats {
-	int pid;
-	char name[128];
-	char state;
-	int ppid;
-	int pgrp;
-	int session;
-	int tty_nr;
-	int tpgid;
-	unsigned int flags;
-	unsigned long int minflt;
-	unsigned long int cminflt;
-	unsigned long int majflt;
-	unsigned long int cmajflt;
-	unsigned long int utime;
-	unsigned long int stime;
-	long int cutime;
-	long int cstime;
-	long int priority;
-	long int nice;
-	long int num_threads;
-	long int itrealvalue;
-	unsigned long long int starttime;
-	unsigned long int vsize;
-	long int rss;
-};
 
 struct SystemSettings {
 	int mClkTck;
@@ -61,14 +28,12 @@ private:
 		int mTid;
 		int mFd;;
 		char mName[64];
-		RawStats mPrevStats;
 	};
 
 private:
 	int mStatFd;
 	int mPid;
 	std::string mName;
-	RawStats mPrevStats;
 	const SystemSettings *mSysSettings;
 
 	std::map<int, ThreadInfo> mThreads;
@@ -78,23 +43,25 @@ private:
 
 	int getPidFdCount();
 
-	static int readStats(int fd, int pid, RawStats *procstat);
-	static bool testPidName(int pid, const char *name);
-	static int findProcess(const char *name, int *outPid);
+	int addAndProcessThread(uint64_t ts, int tid,
+				const SystemMonitor::Callbacks &cb);
 
-	int processThread(ThreadInfo *info,
-			  uint64_t ts,
-			  int timeDiff,
-			  const SystemMonitor::Callbacks &cb);
-
-	int addThread(int tid);
-
-	int researchThreads();
+	int researchThreads(uint64_t ts,
+			    const SystemMonitor::Callbacks &cb);
 
 	int processThreads(uint64_t ts,
 			   int timeDiff,
 			   long int numThreads,
 			   const SystemMonitor::Callbacks &cb);
+
+	int readThreadStats(ThreadInfo *info,
+			    uint64_t ts,
+			    int timeDiff,
+			    const SystemMonitor::Callbacks &cb);
+
+	int readProcessStats(uint64_t ts,
+					     SystemMonitor::ProcessStats *stats,
+					     const SystemMonitor::Callbacks &cb);
 
 public:
 	ProcessMonitor(const char *name, const SystemSettings *sysSettings);
@@ -134,40 +101,12 @@ void ProcessMonitor::clear()
 	mThreads.clear();
 }
 
-int ProcessMonitor::processThread(ThreadInfo *info,
-				  uint64_t ts,
-				  int timeDiff,
-				  const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::addAndProcessThread(
+		uint64_t ts,
+		int tid,
+		const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ThreadStats stats;
-	RawStats rawStats;
-	int ret;
-
-	ret = readStats(info->mFd, info->mTid, &rawStats);
-	if (ret < 0) {
-		// Thread finished
-		close(info->mFd);
-		mThreads.erase(info->mTid);
-		return ret;
-	}
-
-	stats.mTs = ts;
-	stats.mPid = mPid;
-	stats.mTid = info->mTid;
-	stats.mName = info->mName;
-	stats.mUtime = rawStats.utime;
-	stats.mStime = rawStats.stime;
-
-	info->mPrevStats = rawStats;
-
-	if (cb.mThreadStats)
-		cb.mThreadStats(stats, cb.mUserdata);
-
-	return 0;
-}
-
-int ProcessMonitor::addThread(int tid)
-{
 	ThreadInfo info;
 	char path[128];
 	int ret;
@@ -187,7 +126,7 @@ int ProcessMonitor::addThread(int tid)
 	info.mTid = tid;
 	info.mFd = ret;
 
-	ret = readStats(info.mFd, tid, &info.mPrevStats);
+	ret = pfstools::readThreadStats(info.mFd, &stats);
 	if (ret < 0) {
 		close(info.mFd);
 		return ret;
@@ -196,7 +135,7 @@ int ProcessMonitor::addThread(int tid)
 	snprintf(info.mName, sizeof(info.mName),
 		 "%d-%s",
 		 tid,
-		 info.mPrevStats.name);
+		 stats.mName);
 
 	// Register thread
 	auto insertRet = mThreads.insert( {tid, info} );
@@ -206,10 +145,20 @@ int ProcessMonitor::addThread(int tid)
 		return -EPERM;
 	}
 
+	// Notify thread stats
+	stats.mTs = ts;
+	strncpy(stats.mName, info.mName, sizeof(stats.mName));
+	stats.mPid = mPid;
+
+	if (cb.mThreadStats)
+		cb.mThreadStats(stats, cb.mUserdata);
+
 	return 0;
 }
 
-int ProcessMonitor::researchThreads()
+int ProcessMonitor::researchThreads(
+		uint64_t ts,
+		const SystemMonitor::Callbacks &cb)
 {
 	DIR *d;
 	struct dirent entry;
@@ -249,7 +198,7 @@ int ProcessMonitor::researchThreads()
 
 		// Avoid to add thread if already exists
 		if (mThreads.count(tid) == 0) {
-			ret = addThread(tid);
+			ret = addAndProcessThread(ts, tid, cb);
 			if (ret < 0)
 				printf("Fail to add thread %d\n", tid);
 		}
@@ -265,6 +214,56 @@ closedir:
 	return ret;
 }
 
+int ProcessMonitor::readThreadStats(ThreadInfo *info,
+				    uint64_t ts,
+				    int timeDiff,
+				    const SystemMonitor::Callbacks &cb)
+{
+	SystemMonitor::ThreadStats stats;
+	int ret;
+
+	ret = pfstools::readThreadStats(info->mFd, &stats);
+	if (ret < 0) {
+		// Thread finished
+		printf("Can't read thread stats '%d'\n", info->mTid);
+		return ret;
+	}
+
+	stats.mTs = ts;
+	strncpy(stats.mName, info->mName, sizeof(stats.mName));
+	stats.mPid = mPid;
+
+	if (cb.mThreadStats)
+		cb.mThreadStats(stats, cb.mUserdata);
+
+	return 0;
+}
+
+int ProcessMonitor::readProcessStats(uint64_t ts,
+				     SystemMonitor::ProcessStats *stats,
+				     const SystemMonitor::Callbacks &cb)
+{
+	int ret;
+
+	// Get stats
+	ret = pfstools::readProcessStats(mStatFd, stats);
+	if (ret < 0) {
+		printf("Can't find pid stats '%s'\n", mName.c_str());
+		return ret;
+	}
+
+	stats->mTs = ts;
+
+	// Disable fd count. Should be disabled by default and activable
+	// by user.
+	// stats.mFdCount = getPidFdCount();
+
+	if (cb.mProcessStats)
+		cb.mProcessStats(*stats, cb.mUserdata);
+
+	return 0;
+}
+
 int ProcessMonitor::processThreads(uint64_t ts,
 				   int timeDiff,
 				   long int numThreads,
@@ -275,12 +274,17 @@ int ProcessMonitor::processThreads(uint64_t ts,
 
 	// Process all already known threads.
 	foundThreads = 0;
-	for (auto &thread : mThreads) {
-		ret = processThread(&thread.second, ts, timeDiff, cb);
-		if (ret < 0)
-			printf("Fail to process thread %d\n", thread.first);
-		else
+	for (auto it = mThreads.begin(); it != mThreads.end(); it++) {
+		ThreadInfo *info = &it->second;
+
+		ret = readThreadStats(info, ts, timeDiff, cb);
+		if (ret < 0) {
+			printf("Fail to process thread %d\n", info->mTid);
+			close(info->mFd);
+			mThreads.erase(it);
+		} else {
 			foundThreads++;
+		}
 	}
 
 	/**
@@ -290,7 +294,7 @@ int ProcessMonitor::processThreads(uint64_t ts,
 	 * - a known thread has stopped
 	 */
 	if (foundThreads != numThreads)
-		researchThreads();
+		researchThreads(ts, cb);
 
 	return 0;
 }
@@ -300,12 +304,12 @@ int ProcessMonitor::process(uint64_t ts,
 			    const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ProcessStats stats;
-	RawStats rawStats;
-	char path[64];
 	int ret;
 
 	if (mPid == INVALID_PID) {
-		ret = findProcess(mName.c_str(), &mPid);
+		char path[64];
+
+		ret = pfstools::findProcess(mName.c_str(), &mPid);
 		if (ret < 0)
 			return ret;
 
@@ -317,48 +321,17 @@ int ProcessMonitor::process(uint64_t ts,
 			printf("Fail to open %s : %d(%m)\n", path, errno);
 			return ret;
 		}
-
-		ret = readStats(mStatFd, mPid, &mPrevStats);
-		if (ret < 0) {
-			printf("Can't find pid stats '%s'\n", mName.c_str());
-			clear();
-			return ret;
-		}
-
-		researchThreads();
-
-		return -EAGAIN;
 	}
 
 	// Get stats
-	ret = readStats(mStatFd, mPid, &rawStats);
+	ret = readProcessStats(ts, &stats, cb);
 	if (ret < 0) {
-		printf("Can't find pid stats '%s'\n", mName.c_str());
 		clear();
 		return ret;
 	}
 
-	stats.mTs = ts;
-	stats.mPid = mPid;
-	stats.mName = mName.c_str();
-	stats.mUtime = rawStats.utime;
-	stats.mStime = rawStats.stime;
-
-	stats.mVsize = rawStats.vsize / 1024;
-	stats.mRss = rawStats.rss * mSysSettings->mPagesize / 1024;
-	stats.mThreadCount = rawStats.num_threads;
-
-	// Disable fd count. Should be disabled by default and activable
-	// by user.
-	// stats.mFdCount = getPidFdCount();
-
-	mPrevStats = rawStats;
-
-	if (cb.mProcessStats)
-		cb.mProcessStats(stats, cb.mUserdata);
-
 	// Process threads
-	processThreads(ts, timeDiff, rawStats.num_threads, cb);
+	processThreads(ts, timeDiff, stats.mThreadCount, cb);
 
 	return 0;
 }
@@ -410,126 +383,6 @@ static int getTimeNs(uint64_t *ns)
 	*ns = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
 
 	return 0;
-}
-
-int ProcessMonitor::readStats(int fd, int pid, RawStats *procstat)
-{
-	char strstat[1024];
-	ssize_t readRet;
-	int ret;
-
-	readRet = pread(fd, strstat, sizeof(strstat), 0);
-	if (readRet == -1) {
-		ret = -errno;
-		printf("read() failed : %d(%m)", errno);
-		return ret;
-	}
-
-	// Remove trailing '\n'
-	strstat[readRet - 1] = '\0';
-
-	// Extract process name
-	ret = sscanf(strstat, STAT_PATTERN,
-		     &procstat->pid,
-		     procstat->name,
-		     &procstat->state,
-		     &procstat->ppid,
-		     &procstat->pgrp,
-		     &procstat->session,
-		     &procstat->tty_nr,
-		     &procstat->tpgid,
-		     &procstat->flags,
-		     &procstat->minflt,
-		     &procstat->cminflt,
-		     &procstat->majflt,
-		     &procstat->cmajflt,
-		     &procstat->utime,
-		     &procstat->stime,
-		     &procstat->cutime,
-		     &procstat->cstime,
-		     &procstat->priority,
-		     &procstat->nice,
-		     &procstat->num_threads,
-		     &procstat->itrealvalue,
-		     &procstat->starttime,
-		     &procstat->vsize,
-		     &procstat->rss);
-	if (ret != STAT_PATTERN_COUNT) {
-		ret = -EINVAL;
-		printf("Fail to parse stats for pid %d\n", pid);
-		goto error;
-	}
-
-	return 0;
-
-error:
-	return ret;
-
-}
-
-bool ProcessMonitor::testPidName(int pid, const char *name)
-{
-	RawStats procstat;
-	char path[128];
-	int fd;
-	int ret;
-
-	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
-
-	fd = open(path, O_RDONLY|O_CLOEXEC);
-	if (fd == -1) {
-		ret = -errno;
-		printf("Fail to open %s : %d(%m)\n", path, errno);
-		return ret;
-	}
-
-	ret = readStats(fd, pid, &procstat);
-	close(fd);
-	if (ret < 0) {
-		return false;
-	}
-	return strcmp(name, procstat.name) == 0;
-}
-
-int ProcessMonitor::findProcess(const char *name, int *outPid)
-{
-	DIR *d;
-	struct dirent entry;
-	struct dirent *result = nullptr;
-	int pid;
-	char *endptr;
-	int ret;
-	bool found = false;
-
-	d = opendir("/proc");
-	if (!d) {
-		ret = -errno;
-		printf("Fail to open /proc : %d(%m)\n", errno);
-		return ret;
-	}
-
-	while (!found) {
-		ret = readdir_r(d, &entry, &result);
-		if (ret == 0 && !result)
-			break;
-
-		pid = strtol(entry.d_name, &endptr, 10);
-		if (errno == ERANGE) {
-			printf("Ignore %s\n", entry.d_name);
-			continue;
-		} else if (*endptr != '\0') {
-			continue;
-		}
-
-		found = testPidName(pid, name);
-	}
-
-	closedir(d);
-
-	if (found)
-		*outPid = pid;
-
-	return found ? 0 : -ENOENT;
 }
 
 class SystemMonitorImpl : public SystemMonitor {

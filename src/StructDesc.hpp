@@ -12,6 +12,10 @@
 	(desc)->registerRawValue<decltype(_class_::field)>( \
 			name, offsetof(_class_, field))
 
+#define REGISTER_STRING(desc, _class_, field, name) \
+	(desc)->registerRawValue<const char *>( \
+			name, offsetof(_class_, field))
+
 class StructDesc {
 private:
 	enum EntryType : uint8_t {
@@ -121,5 +125,12 @@ public:
 		return writeValueInternal(sink, (void *) p);
 	}
 };
+
+template <>
+ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base)
+{
+	std::ptrdiff_t p = (std::ptrdiff_t ) base + desc->mParams.raw.offset;
+	return ValueTrait<const char *>::write(sink, (const char *) p);
+}
 
 #endif // !__STRUCTDESC_HPP__

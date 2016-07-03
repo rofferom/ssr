@@ -147,7 +147,7 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mPid, "pid");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mName, "name");
+	ret = REGISTER_STRING(&desc->mDesc, SystemMonitor::ProcessStats, mName, "name");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mVsize, "vsize");
@@ -187,7 +187,7 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mTid, "tid");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mName, "name");
+	ret = REGISTER_STRING(&desc->mDesc, SystemMonitor::ThreadStats, mName, "name");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mCpuLoad, "cpuload");

@@ -22,9 +22,9 @@ public:
 	struct ProcessStats {
 		uint64_t    mTs;
 		uint32_t    mPid;
-		const char *mName;
-		uint32_t    mVsize; // kbytes
-		uint32_t    mRss; // kbytes
+		char        mName[64];
+		uint32_t    mVsize;
+		uint32_t    mRss;
 		uint16_t    mThreadCount;
 		uint16_t    mFdCount;
 
@@ -36,7 +36,7 @@ public:
 		uint64_t    mTs;
 		uint32_t    mPid;
 		uint32_t    mTid;
-		const char *mName;
+		char        mName[64];
 		uint16_t    mCpuLoad;
 
 		uint64_t    mUtime;
