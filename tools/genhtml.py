@@ -24,6 +24,7 @@ class SysstatsReader:
 		self.samples = {}
 
 		self.clkTck = 0
+		self.pagesize = 0
 
 		self.totalAcqTime = 0
 		self.ignoredCount = 0
@@ -34,6 +35,7 @@ class SysstatsReader:
 	def __call__(self, name, data):
 		if name == 'systemconfig':
 			self.clkTck = data['clktck']
+			self.pagesize = data['pagesize']
 			return
 
 		if name == 'acqduration':
@@ -80,6 +82,10 @@ class SysstatsReader:
 			cpuload *= 100
 
 			sample[data['name']] = cpuload
+		elif self.sampleName == 'vsize':
+			sample[data['name']] = data['vsize'] / 1024
+		elif self.sampleName == 'rss':
+			sample[data['name']] = data['rss'] * self.pagesize / 1024
 		else:
 			sample[data['name']] = data[self.sampleName]
 

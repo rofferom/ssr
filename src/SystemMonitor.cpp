@@ -17,11 +17,6 @@ namespace {
 
 #define INVALID_PID -1
 
-struct SystemSettings {
-	int mClkTck;
-	int mPagesize ;
-};
-
 class ProcessMonitor {
 private:
 	struct ThreadInfo {
@@ -34,7 +29,7 @@ private:
 	int mStatFd;
 	int mPid;
 	std::string mName;
-	const SystemSettings *mSysSettings;
+	const SystemMonitor::SystemConfig *mSysSettings;
 
 	std::map<int, ThreadInfo> mThreads;
 
@@ -62,14 +57,14 @@ private:
 					     const SystemMonitor::Callbacks &cb);
 
 public:
-	ProcessMonitor(const char *name, const SystemSettings *sysSettings);
+	ProcessMonitor(const char *name, const SystemMonitor::SystemConfig *sysSettings);
 	~ProcessMonitor();
 
 	int process(uint64_t ts, const SystemMonitor::Callbacks &cb);
 };
 
 ProcessMonitor::ProcessMonitor(const char *name,
-			       const SystemSettings *sysSettings)
+			       const SystemMonitor::SystemConfig *sysSettings)
 {
 	mStatFd = -1;
 	mName = name;
@@ -380,7 +375,7 @@ static int getTimeNs(uint64_t *ns)
 class SystemMonitorImpl : public SystemMonitor {
 private:
 	Callbacks mCb;
-	SystemSettings mSysSettings;
+	SystemConfig mSysSettings;
 	std::list<ProcessMonitor *> mMonitors;
 	uint64_t mLastProcess;
 
@@ -412,7 +407,7 @@ int SystemMonitorImpl::readSystemConfig(SystemConfig *config)
 	if (!config)
 		return -EINVAL;
 
-	config->mClkTck = mSysSettings.mClkTck;
+	*config = mSysSettings;
 
 	return 0;
 }

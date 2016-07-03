@@ -108,6 +108,10 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemConfig, mClkTck, "clktck");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemConfig, mPagesize, "pagesize");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+
 	mDescList[RECORD_TYPE_SYS_CONFIG] = desc;
 	desc = nullptr;
 

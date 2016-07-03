@@ -10,6 +10,7 @@ class SystemMonitor {
 public:
 	struct SystemConfig {
 		int32_t mClkTck;
+		int32_t mPagesize ;
 	};
 
 	struct SystemStats {
