@@ -95,8 +95,10 @@ class SysstatsReader:
 		return self.processList
 
 	def printStats(self):
-		print('Average acquisition time : %d us' % (self.totalAcqTime / self.sampleCount))
-		print('%d threads' % len(self.processList))
+		average = self.totalAcqTime / self.sampleCount
+		threadCount = len(self.processList)
+		print('Average acquisition time : %d us' % average)
+		print('%d threads (%d us for each thread)' % (threadCount, average / threadCount))
 
 		for name in self.processList:
 			print('\t%s' % name)
