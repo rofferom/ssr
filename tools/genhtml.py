@@ -39,7 +39,7 @@ class SysstatsReader:
 			return
 
 		if name == 'acqduration':
-			acqTime = data['end'] - data['start']
+			acqTime = (data['end'] - data['start']) / 1000
 			print('ts %u - Acquisition took %6u us' % (data['start'], acqTime))
 
 			if self.ignoredCount < 2:
