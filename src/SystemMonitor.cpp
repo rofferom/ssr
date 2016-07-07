@@ -23,6 +23,8 @@ private:
 		int mTid;
 		int mFd;;
 		char mName[64];
+
+		pfstools::RawStats mRawStats;
 	};
 
 private:
@@ -30,6 +32,8 @@ private:
 	int mPid;
 	std::string mName;
 	const SystemMonitor::SystemConfig *mSysSettings;
+
+	pfstools::RawStats mRawStats;
 
 	std::map<int, ThreadInfo> mThreads;
 
@@ -44,23 +48,12 @@ private:
 	int researchThreads(uint64_t ts,
 			    const SystemMonitor::Callbacks &cb);
 
-	int processThreads(uint64_t ts,
-			   long int numThreads,
-			   const SystemMonitor::Callbacks &cb);
-
-	int readThreadStats(ThreadInfo *info,
-			    uint64_t ts,
-			    const SystemMonitor::Callbacks &cb);
-
-	int readProcessStats(uint64_t ts,
-					     SystemMonitor::ProcessStats *stats,
-					     const SystemMonitor::Callbacks &cb);
-
 public:
 	ProcessMonitor(const char *name, const SystemMonitor::SystemConfig *sysSettings);
 	~ProcessMonitor();
 
-	int process(uint64_t ts, const SystemMonitor::Callbacks &cb);
+	int readRawStats();
+	int processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb);
 };
 
 ProcessMonitor::ProcessMonitor(const char *name,
@@ -97,6 +90,7 @@ int ProcessMonitor::addAndProcessThread(
 		int tid,
 		const SystemMonitor::Callbacks &cb)
 {
+	pfstools::RawStats rawStats;
 	SystemMonitor::ThreadStats stats;
 	ThreadInfo info;
 	char path[128];
@@ -117,11 +111,15 @@ int ProcessMonitor::addAndProcessThread(
 	info.mTid = tid;
 	info.mFd = ret;
 
-	ret = pfstools::readThreadStats(info.mFd, &stats);
+	ret = pfstools::readRawStats(info.mFd, &rawStats);
 	if (ret < 0) {
 		close(info.mFd);
 		return ret;
 	}
+
+	ret = pfstools::readThreadStats(rawStats.mContent, &stats);
+	if (ret < 0)
+		return ret;
 
 	snprintf(info.mName, sizeof(info.mName),
 		 "%d-%s",
@@ -205,92 +203,8 @@ closedir:
 	return ret;
 }
 
-int ProcessMonitor::readThreadStats(ThreadInfo *info,
-				    uint64_t ts,
-				    const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::readRawStats()
 {
-	SystemMonitor::ThreadStats stats;
-	int ret;
-
-	ret = pfstools::readThreadStats(info->mFd, &stats);
-	if (ret < 0) {
-		// Thread finished
-		printf("Can't read thread stats '%d'\n", info->mTid);
-		return ret;
-	}
-
-	stats.mTs = ts;
-	strncpy(stats.mName, info->mName, sizeof(stats.mName));
-	stats.mPid = mPid;
-
-	if (cb.mThreadStats)
-		cb.mThreadStats(stats, cb.mUserdata);
-
-	return 0;
-}
-
-int ProcessMonitor::readProcessStats(uint64_t ts,
-				     SystemMonitor::ProcessStats *stats,
-				     const SystemMonitor::Callbacks &cb)
-{
-	int ret;
-
-	// Get stats
-	ret = pfstools::readProcessStats(mStatFd, stats);
-	if (ret < 0) {
-		printf("Can't find pid stats '%s'\n", mName.c_str());
-		return ret;
-	}
-
-	stats->mTs = ts;
-
-	// Disable fd count. Should be disabled by default and activable
-	// by user.
-	// stats.mFdCount = getPidFdCount();
-
-	if (cb.mProcessStats)
-		cb.mProcessStats(*stats, cb.mUserdata);
-
-	return 0;
-}
-
-int ProcessMonitor::processThreads(uint64_t ts,
-				   long int numThreads,
-				   const SystemMonitor::Callbacks &cb)
-{
-	long int foundThreads;
-	int ret;
-
-	// Process all already known threads.
-	foundThreads = 0;
-	for (auto it = mThreads.begin(); it != mThreads.end(); it++) {
-		ThreadInfo *info = &it->second;
-
-		ret = readThreadStats(info, ts, cb);
-		if (ret < 0) {
-			printf("Fail to process thread %d\n", info->mTid);
-			close(info->mFd);
-			mThreads.erase(it);
-		} else {
-			foundThreads++;
-		}
-	}
-
-	/**
-	 * If there are missing threads, research any new thread.
-	 * This can happen if :
-	 * - a new thread has been created
-	 * - a known thread has stopped
-	 */
-	if (foundThreads != numThreads)
-		researchThreads(ts, cb);
-
-	return 0;
-}
-
-int ProcessMonitor::process(uint64_t ts, const SystemMonitor::Callbacks &cb)
-{
-	SystemMonitor::ProcessStats stats;
 	int ret;
 
 	if (mPid == INVALID_PID) {
@@ -310,15 +224,70 @@ int ProcessMonitor::process(uint64_t ts, const SystemMonitor::Callbacks &cb)
 		}
 	}
 
-	// Get stats
-	ret = readProcessStats(ts, &stats, cb);
+	// Read process stats
+	ret = pfstools::readRawStats(mStatFd, &mRawStats);
 	if (ret < 0) {
-		clear();
+		close(mStatFd);
+		mStatFd = -1;
 		return ret;
 	}
 
-	// Process threads
-	processThreads(ts, stats.mThreadCount, cb);
+	for (auto &thread : mThreads) {
+		ThreadInfo *threadInfo = &thread.second;
+		pfstools::readRawStats(threadInfo->mFd, &threadInfo->mRawStats);
+	}
+
+	return 0;
+}
+
+int ProcessMonitor::processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb)
+{
+	int foundThreads;
+	SystemMonitor::ThreadStats threadStats;
+	SystemMonitor::ProcessStats processStats;
+	int ret;
+
+	if (!mRawStats.mPending)
+		return 0;
+
+	ret = pfstools::readProcessStats(mRawStats.mContent, &processStats);
+	if (ret < 0)
+		return ret;
+
+	if (cb.mProcessStats) {
+		processStats.mTs = ts;
+		cb.mProcessStats(processStats, cb.mUserdata);
+	}
+
+	// Process thread stats
+	foundThreads = 0;
+	for (auto &thread : mThreads) {
+		ThreadInfo *threadInfo = &thread.second;
+
+		if (!threadInfo->mRawStats.mPending)
+			continue;
+
+		ret = pfstools::readThreadStats(threadInfo->mRawStats.mContent,
+						&threadStats);
+		if (ret < 0)
+			continue;
+
+		if (cb.mThreadStats) {
+			threadStats.mTs = ts;
+
+			strncpy(threadStats.mName, threadInfo->mName,
+				sizeof(threadStats.mName));
+
+			threadStats.mPid = mPid;
+
+			cb.mThreadStats(threadStats, cb.mUserdata);
+		}
+
+		foundThreads++;
+	}
+
+	if (foundThreads != processStats.mThreadCount)
+		researchThreads(ts, cb);
 
 	return 0;
 }
@@ -441,7 +410,7 @@ int SystemMonitorImpl::process()
 
 	// Start process monitors
 	for (auto &m :mMonitors)
-		m->process(start, mCb);
+		m->readRawStats();
 
 	// Compute acquisition duration
 	ret = getTimeNs(&end);
@@ -450,6 +419,10 @@ int SystemMonitorImpl::process()
 
 	if (mCb.mAcquisitionDuration)
 		mCb.mAcquisitionDuration( { start, end }, mCb.mUserdata);
+
+	// Process fetched data
+	for (auto &m :mMonitors)
+		m->processRawStats(start, mCb);
 
 	mLastProcess = start;
 

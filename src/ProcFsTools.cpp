@@ -37,31 +37,16 @@ struct PidTestCtx {
 	bool mMatch;
 };
 
-int tokenizeStats(int fd, TokenizerCb cb, void *userdata)
+int tokenizeStats(const char *s, TokenizerCb cb, void *userdata)
 {
 	bool doParse;
-	const char *s;
-	char strstat[1024];
-	ssize_t readRet;
 	const char *start = NULL;
 	ParserState state;
 	int idx = 0;
-	int ret;
 
-	if (fd == -1 || !cb)
+	if (!s|| !cb)
 		return -EINVAL;
 
-	readRet = pread(fd, strstat, sizeof(strstat), 0);
-	if (readRet == -1) {
-		ret = -errno;
-		printf("read() failed : %d(%m)", errno);
-		return ret;
-	}
-
-	// Remove trailing '\n'
-	strstat[readRet - 1] = '\0';
-
-	s = strstat;
 	state = PARSER_STATE_IDLE;
 	while (*s != '\0') {
 		switch (state) {
@@ -238,9 +223,11 @@ bool testPidName(int pid, const char *name)
 {
 	PidTestCtx testCtx;
 	char path[128];
+	pfstools::RawStats rawStats;
 	int fd;
 	int ret;
 
+	// Open procfs
 	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
 
 	fd = open(path, O_RDONLY|O_CLOEXEC);
@@ -250,10 +237,17 @@ bool testPidName(int pid, const char *name)
 		return ret;
 	}
 
+	// Read content
+	ret = pfstools::readRawStats(fd, &rawStats);
+	if (ret < 0) {
+		close(fd);
+		return false;
+	}
+
 	testCtx.mName = name;
 	testCtx.mMatch = false;
 
-	ret = tokenizeStats(fd, pidTestCb, &testCtx);
+	ret = tokenizeStats(rawStats.mContent, pidTestCb, &testCtx);
 	close(fd);
 	if (ret < 0) {
 		return false;
@@ -307,20 +301,43 @@ int findProcess(const char *name, int *outPid)
 	return found ? 0 : -ENOENT;
 }
 
-int readProcessStats(int fd, SystemMonitor::ProcessStats *stats)
+int readRawStats(int fd, RawStats *stats)
+{
+	ssize_t readRet;
+	int ret;
+
+	if (fd == -1 || !stats)
+		return -EINVAL;
+
+	readRet = pread(fd, stats->mContent, sizeof(stats->mContent), 0);
+	if (readRet == -1) {
+		ret = -errno;
+		stats->mPending = false;
+		printf("read() failed : %d(%m)", errno);
+		return ret;
+	}
+
+	// Remove trailing '\n'
+	stats->mContent[readRet - 1] = '\0';
+	stats->mPending = true;
+
+	return 0;
+}
+
+int readProcessStats(const char *s, SystemMonitor::ProcessStats *stats)
 {
 	if (!stats)
 		return -EINVAL;
 
-	return tokenizeStats(fd, processStatsCb, stats);
+	return tokenizeStats(s, processStatsCb, stats);
 }
 
-int readThreadStats(int fd, SystemMonitor::ThreadStats *stats)
+int readThreadStats(const char *s, SystemMonitor::ThreadStats *stats)
 {
 	if (!stats)
 			return -EINVAL;
 
-	return tokenizeStats(fd, threadStatsCb, stats);
+	return tokenizeStats(s, threadStatsCb, stats);
 }
 
 } // namespace pfstools

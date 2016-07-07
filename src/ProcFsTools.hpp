@@ -3,13 +3,22 @@
 
 #include "SystemMonitor.hpp"
 
+#define STAT_SIZE 1024
+
 namespace pfstools {
+
+struct RawStats {
+	bool mPending;
+	char mContent[STAT_SIZE];
+};
 
 int findProcess(const char *name, int *outPid);
 
-int readProcessStats(int fd, SystemMonitor::ProcessStats *stats);
+int readRawStats(int fd, RawStats *stats);
 
-int readThreadStats(int fd, SystemMonitor::ThreadStats *stats);
+int readProcessStats(const char *s, SystemMonitor::ProcessStats *stats);
+
+int readThreadStats(const char *s, SystemMonitor::ThreadStats *stats);
 
 } // namespace pfstools
 
