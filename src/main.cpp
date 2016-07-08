@@ -21,12 +21,14 @@ static struct Context {
 	bool stop;
 	int stopfd;
 	int timer;
+	int durationTimer;
 
 	Context()
 	{
 		stop = false;
 		stopfd = -1;
 		timer = -1;
+		durationTimer = -1;
 	}
 } ctx;
 
@@ -34,28 +36,59 @@ struct Params {
 	bool help;
 	std::string output;
 	int period;
+	int duration;
 
 	Params()
 	{
 		help = false;
 		period = 1;
+		duration = -1;
 	}
 };
 
 static const struct option argsOptions[] = {
 	{ "help"  , optional_argument, 0, 'h' },
 	{ "period", optional_argument, 0, 'p' },
+	{ "duration", optional_argument, 0, 'd' },
 	{ "output", required_argument, 0, 'o' },
 	{ 0, 0, 0}
 };
+
+static int readDecimalParam(int *out_v, const char *name)
+{
+	char *end;
+	long int v;
+
+	errno = 0;
+	v = strtol(optarg, &end, 10);
+	if (errno != 0) {
+		int ret = -errno;
+		printf("Unable to parse '%s' %s : %d(%m)\n",
+		       name, optarg, errno);
+		return ret;
+	} else if (*end != '\0') {
+		printf("'%s' arg '%s' is not decimal\n",
+		        name, optarg);
+		return -EINVAL;
+	} else if (v <= 0) {
+		printf("'%s' arg '%s' is negative or null\n",
+		       name, optarg);
+		return -EINVAL;
+	}
+
+	*out_v = v;
+
+	return 0;
+}
 
 int parseArgs(int argc, char *argv[], Params *params)
 {
 	int optionIndex = 0;
 	int value;
+	int ret;
 
 	while (true) {
-		value = getopt_long(argc, argv, "ho:p:", argsOptions, &optionIndex);
+		value = getopt_long(argc, argv, "ho:p:d:", argsOptions, &optionIndex);
 		if (value == -1 || value == '?')
 			break;
 
@@ -68,30 +101,17 @@ int parseArgs(int argc, char *argv[], Params *params)
 			params->output = optarg;
 			break;
 
-		case 'p': {
-			char *end;
-			long int v;
-
-			errno = 0;
-			v = strtol(optarg, &end, 10);
-			if (errno != 0) {
-				int ret = -errno;
-				printf("Unable to parse period %s : %d(%m)\n",
-				       optarg, errno);
+		case 'd':
+			ret = readDecimalParam(&params->duration, "duration");
+			if (ret < 0)
 				return ret;
-			} else if (*end != '\0') {
-				printf("Period arg '%s' is not decimal\n",
-				        optarg);
-				return -EINVAL;
-			} else if (v <= 0) {
-				printf("Period arg '%s' is negative or null\n",
-				        optarg);
-				return -EINVAL;
-			}
-
-			params->period = v;
 			break;
-		}
+
+		case 'p':
+			ret = readDecimalParam(&params->period, "period");
+			if (ret < 0)
+				return ret;
+			break;
 
 		default:
 			break;
@@ -116,6 +136,7 @@ void printUsage(int argc, char *argv[])
 	printf("optional arguments:\n");
 	printf("  %-20s %s\n", "-h, --help", "show this help message and exit");
 	printf("  %-20s %s\n", "-p, --period", "sample acquisition period (seconds). Default : 1");
+	printf("  %-20s %s\n", "-d, --duration", "acquisition duration (seconds). Default : infinite");
 	printf("  %-20s %s\n", "-o, --output", "output record file");
 }
 
@@ -170,7 +191,8 @@ static void acquisitionDurationCb(
 int main(int argc, char *argv[])
 {
 	struct itimerspec timer;
-	struct pollfd fds[2];
+	struct pollfd fds[3];
+	int fdsCount;
 	Params params;
 	SystemMonitor::SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
@@ -247,6 +269,10 @@ int main(int argc, char *argv[])
 
 	ctx.stopfd = ret;
 
+	fds[0].fd = ctx.stopfd;
+	fds[0].events = POLLIN;
+	fds[0].revents = 0;
+
 	// Create timer
 	ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
 	if (ret < 0) {
@@ -269,18 +295,46 @@ int main(int argc, char *argv[])
 		goto error;
 	}
 
-	// Start poll
-	fds[0].fd = ctx.stopfd;
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
 	fds[1].fd = ctx.timer;
 	fds[1].events = POLLIN;
 	fds[1].revents = 0;
 
+	fdsCount = 2;
+
+	// Create duration timer
+	if (params.duration > 0) {
+		ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
+		if (ret < 0) {
+			printf("timerfd_create() failed : %d(%m)\n", errno);
+			goto error;
+		}
+
+		ctx.durationTimer = ret;
+
+		// Start timer
+		timer.it_value.tv_sec = params.duration;
+		timer.it_value.tv_nsec = 0;
+
+		timer.it_interval.tv_sec = 0;
+		timer.it_interval.tv_nsec = 0;
+
+		ret = timerfd_settime(ctx.durationTimer, 0, &timer, NULL);
+		if (ret < 0) {
+			printf("timerfd_settime() failed : %d(%m)\n", errno);
+			goto error;
+		}
+
+		fds[2].fd = ctx.durationTimer;
+		fds[2].events = POLLIN;
+		fds[2].revents = 0;
+
+		fdsCount++;
+	}
+
+	// Start poll
 	while (true) {
 		do {
-			ret = poll(fds, SIZEOF_ARRAY(fds), -1);
+			ret = poll(fds, fdsCount, -1);
 		} while (ret == -1 && errno == EINTR);
 
 		if (ret == -1) {
@@ -303,6 +357,9 @@ int main(int argc, char *argv[])
 			if (ret < 0)
 				printf("read() failed : %d(%m)\n", errno);
 		}
+
+		if (fds[2].revents & POLLIN)
+			break;
 	}
 
 	recorder->close();
