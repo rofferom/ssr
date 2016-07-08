@@ -9,6 +9,7 @@ namespace pfstools {
 
 struct RawStats {
 	bool mPending;
+	uint64_t mTs;
 	char mContent[STAT_SIZE];
 };
 

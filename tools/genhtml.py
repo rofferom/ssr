@@ -32,6 +32,8 @@ class SysstatsReader:
 
 		self.lastSamples = {}
 
+		self.currentTs = None
+
 	def __call__(self, name, data):
 		if name == 'systemconfig':
 			self.clkTck = data['clktck']
@@ -39,6 +41,7 @@ class SysstatsReader:
 			return
 
 		if name == 'acqduration':
+			self.currentTs = data['start']
 			acqTime = (data['end'] - data['start']) / 1000
 			print('ts %u - Acquisition took %6u us' % (data['start'], acqTime))
 
@@ -64,12 +67,11 @@ class SysstatsReader:
 			self.lastSamples[data['name']] = data
 			return
 
-		ts = data['ts']
 		try:
-			sample = self.samples[ts]
+			sample = self.samples[self.currentTs]
 		except KeyError:
-			sample = { 'ts': ts }
-			self.samples[ts] = sample
+			sample = { 'ts': self.currentTs }
+			self.samples[self.currentTs] = sample
 
 		if self.sampleName == 'cpuload':
 			ticks = data['utime'] + data['stime']

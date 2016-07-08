@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include "ProcFsTools.hpp"
 
@@ -301,6 +302,23 @@ int findProcess(const char *name, int *outPid)
 	return found ? 0 : -ENOENT;
 }
 
+static int getTimeNs(uint64_t *ns)
+{
+	struct timespec ts;
+	int ret;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0) {
+		ret = -errno;
+		printf("clock_gettime() failed : %d(%m)", errno);
+		return ret;
+	}
+
+	*ns = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+	return 0;
+}
+
 int readRawStats(int fd, RawStats *stats)
 {
 	ssize_t readRet;
@@ -308,6 +326,8 @@ int readRawStats(int fd, RawStats *stats)
 
 	if (fd == -1 || !stats)
 		return -EINVAL;
+
+	getTimeNs(&stats->mTs);
 
 	readRet = pread(fd, stats->mContent, sizeof(stats->mContent), 0);
 	if (readRet == -1) {

@@ -54,7 +54,26 @@ public:
 
 	int readRawStats();
 	int processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb);
+
+	const char *getName() const { return mName.c_str(); }
 };
+
+static int getTimeNs(uint64_t *ns)
+{
+	struct timespec ts;
+	int ret;
+
+	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
+	if (ret < 0) {
+		ret = -errno;
+		printf("clock_gettime() failed : %d(%m)", errno);
+		return ret;
+	}
+
+	*ns = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
+
+	return 0;
+}
 
 ProcessMonitor::ProcessMonitor(const char *name,
 			       const SystemMonitor::SystemConfig *sysSettings)
@@ -255,7 +274,7 @@ int ProcessMonitor::processRawStats(uint64_t ts, const SystemMonitor::Callbacks 
 		return ret;
 
 	if (cb.mProcessStats) {
-		processStats.mTs = ts;
+		processStats.mTs = mRawStats.mTs;
 		cb.mProcessStats(processStats, cb.mUserdata);
 	}
 
@@ -273,7 +292,7 @@ int ProcessMonitor::processRawStats(uint64_t ts, const SystemMonitor::Callbacks 
 			continue;
 
 		if (cb.mThreadStats) {
-			threadStats.mTs = ts;
+			threadStats.mTs = threadInfo->mRawStats.mTs;
 
 			strncpy(threadStats.mName, threadInfo->mName,
 				sizeof(threadStats.mName));
@@ -322,23 +341,6 @@ int ProcessMonitor::getPidFdCount()
 	closedir(d);
 
 	return count;
-}
-
-static int getTimeNs(uint64_t *ns)
-{
-	struct timespec ts;
-	int ret;
-
-	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
-	if (ret < 0) {
-		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
-		return ret;
-	}
-
-	*ns = ts.tv_sec * 1000000000ULL + ts.tv_nsec;
-
-	return 0;
 }
 
 class SystemMonitorImpl : public SystemMonitor {
@@ -409,7 +411,7 @@ int SystemMonitorImpl::process()
 		return ret;
 
 	// Start process monitors
-	for (auto &m :mMonitors)
+	for (auto m :mMonitors)
 		m->readRawStats();
 
 	// Compute acquisition duration
