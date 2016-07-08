@@ -294,7 +294,7 @@ int main(int argc, char *argv[])
 		if (ctx.stop)
 			break;
 
-		if (fds[1].events & POLLIN) {
+		if (fds[1].revents & POLLIN) {
 			uint64_t expirations;
 
 			mon->process();
