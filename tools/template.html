@@ -1,33 +1,38 @@
 <html>
-  <head>
-    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <script type="text/javascript">
-      google.charts.load('current', {'packages': ['corechart']});
-      google.charts.setOnLoadCallback(drawChart);
+	<head>
+		<script type="text/javascript" src="http://dygraphs.com/1.1.1/dygraph-combined.js"></script>
 
-      function drawChart() {
-        var data = google.visualization.arrayToDataTable([
-			[ {% for column in columns %} '{{ column }}', {% endfor %} ],
+		<!-- Graph loading -->
+		<script type="text/javascript">
+			function displayGraph() {
+				graph = new Dygraph(
+					document.getElementById("graphdiv"),
+					data,
+					{
+						labels: labels,
+						connectSeparatedPoints: true,
+						legend: 'always',
+						highlightCircleSize: 5,
+						highlightSeriesOpts: { strokeWidth: 3 },
+					} // options
+				);
+			};
+		</script>
 
-			{% for sample in samples %}
-				[ {% for column in sample %} {{ column }}, {% endfor %} ],
-			{% endfor %}
-        ]);
+		<!-- Data definition -->
+		<script type="text/javascript">
+			data = [
+				{% for sample in samples %}
+					[ {% for column in sample %} {{ column }}, {% endfor %} ],
+				{% endfor %}
+			];
 
-        var options = {
-          title: 'Processes stat {{ sampleName }}',
-          curveType: 'function',
-          legend: { position: 'bottom' }
-        };
+			labels = [ {% for column in columns %} '{{ column }}', {% endfor %} ];
+		</script>
+	</head>
 
-        var chart = new google.visualization.LineChart(document.getElementById('curve_chart'));
-
-        chart.draw(data, options);
-      }
-    </script>
-  </head>
-  <body>
-    <div id="curve_chart" style="width: 900px; height: 500px"></div>
-  </body>
+	<body onload="displayGraph()">
+		<div id="graphdiv" style="width:100%; height:100%;"></div>
+	</body>
 </html>
 
