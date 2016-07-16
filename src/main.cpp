@@ -240,9 +240,8 @@ int main(int argc, char *argv[])
 		goto error;
 
 	ret = recorder->open(params.output.c_str());
-	if (ret < 0) {
-		printf("open() failed : %d(%s)\n", -ret, strerror(-ret));
-	}
+	if (ret < 0)
+		goto error;
 
 	// Create monitor
 	cb.mSystemStats = systemStatsCb;
