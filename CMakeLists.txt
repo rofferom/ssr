@@ -15,4 +15,4 @@ add_executable(sysstatsrec ${SYSTAT_CFILES})
 target_link_libraries(sysstatsrec -lrt)
 
 add_executable(cpuload tests/cpuload.c)
-target_link_libraries(cpuload -lm -lpthread)
+target_link_libraries(cpuload -lrt -lm -lpthread)
