@@ -10,100 +10,191 @@ from sysstatsrec.parser import Parser
 DEFAULT_STRUCTNAME = 'processstats'
 DEFAULT_SAMPLENAME = 'cpuload'
 
-class SysstatsReader:
-	def __init__(self, processList, sampleName, structName):
-		if len(processList) == 0:
-			self.allProcess = True
-			self.processList = []
-		else:
-			self.allProcess = False
-			self.processList = processList
+class Helpers:
+	@staticmethod
+	def computeLoad(ticks, duration, sysconfig):
+		cpuload = float(ticks) / float(sysconfig.clkTck)
+		cpuload /= float(duration) / 1000000000.0
+		cpuload *= 100
 
-		self.sampleName = sampleName
-		self.structName = structName
-		self.samples = {}
+		return cpuload
 
-		self.clkTck = 0
-		self.pagesize = 0
+	@staticmethod
+	def computeCpuLoad(prevSample, curSample, sysconfig):
+		ticks = curSample['utime'] + curSample['stime']
+		ticks -= prevSample['utime'] + prevSample['stime']
 
+		duration = curSample['ts'] - prevSample['ts']
+
+		return Helpers.computeLoad(ticks, duration, sysconfig)
+
+	@staticmethod
+	def computeIdleLoad(prevSample, curSample, sysconfig):
+		ticks = curSample['idletime'] - prevSample['idletime']
+		duration = curSample['ts'] - prevSample['ts']
+
+		return Helpers.computeLoad(ticks, duration, sysconfig)
+
+class SystemConfigHandler:
+	def __init__(self):
+		self.clkTck   = None
+		self.pagesize = None
+
+	def handleSample(self, data):
+		self.clkTck   = data['clktck']
+		self.pagesize = data['pagesize']
+
+		print('Got system config : clktck=%d, pagesize=%d' % (self.clkTck, self.pagesize))
+
+class AcqDurationHandler:
+	def __init__(self):
 		self.totalAcqTime = 0
-		self.ignoredCount = 0
 		self.sampleCount = 0
 
-		self.lastSamples = {}
+	def handleSample(self, sample):
+		acqTime = (sample['end'] - sample['start']) / 1000
+		print('ts %u - Acquisition took %6u us' % (sample['start'], acqTime))
 
-		self.currentTs = None
-
-	def __call__(self, name, data):
-		if name == 'systemconfig':
-			self.clkTck = data['clktck']
-			self.pagesize = data['pagesize']
-			return
-
-		if name == 'acqduration':
-			self.currentTs = data['start']
-			acqTime = (data['end'] - data['start']) / 1000
-			print('ts %u - Acquisition took %6u us' % (data['start'], acqTime))
-
-			if self.ignoredCount < 2:
-				self.ignoredCount += 1
-			else:
-				self.totalAcqTime += acqTime
-				self.sampleCount += 1
-
-			return
-
-		if name != self.structName:
-			return
-		elif not self.allProcess and data['name'] not in self.processList:
-			return
-
-		if self.allProcess and data['name'] not in self.processList:
-			self.processList.append(data['name'])
-
-		try:
-			lastSample = self.lastSamples[data['name']]
-		except:
-			self.lastSamples[data['name']] = data
-			return
-
-		try:
-			sample = self.samples[self.currentTs]
-		except KeyError:
-			sample = { 'ts': self.currentTs }
-			self.samples[self.currentTs] = sample
-
-		if self.sampleName == 'cpuload':
-			ticks = data['utime'] + data['stime']
-			ticks -= lastSample['utime'] + lastSample['stime']
-
-			timeDiff = data['ts'] - lastSample['ts']
-
-			cpuload = float(ticks) / float(self.clkTck)
-			cpuload /= float(timeDiff) / 1000000000.0
-			cpuload *= 100
-
-			sample[data['name']] = cpuload
-		elif self.sampleName == 'vsize':
-			sample[data['name']] = data['vsize'] / 1024
-		elif self.sampleName == 'rss':
-			sample[data['name']] = data['rss'] * self.pagesize / 1024
-		else:
-			sample[data['name']] = data[self.sampleName]
-
-		self.lastSamples[data['name']] = data
-
-	def getProcessList(self):
-		return self.processList
+		self.totalAcqTime += acqTime
+		self.sampleCount += 1
 
 	def printStats(self):
 		average = self.totalAcqTime / self.sampleCount
-		threadCount = len(self.processList)
 		print('Average acquisition time : %d us' % average)
-		print('%d threads (%d us for each thread)' % (threadCount, average / threadCount))
 
-		for name in self.processList:
-			print('\t%s' % name)
+class SystemStatsHandler:
+	SAMPLENAME = 'systemstats'
+
+	def __init__(self, args, sysconfig, samples):
+		self.args = args
+		self.sysconfig = sysconfig
+		self.samples = samples
+
+	def handleSample(self, sample):
+		ts = sample['ts']
+
+		lastSample = self.samples.getLastSample(self.SAMPLENAME)
+		if not lastSample:
+			# At least two samples are required. Save the first one without
+			# any extra processing
+			self.samples.saveSample(self.SAMPLENAME, sample)
+			return
+
+		# Record samples for display
+		cpuload = Helpers.computeCpuLoad(lastSample, sample, self.sysconfig)
+		self.samples.addSample('cpuload', ts, cpuload)
+
+		idleload = Helpers.computeIdleLoad(lastSample, sample, self.sysconfig)
+		self.samples.addSample('idle', ts, idleload)
+
+		# Save sample to get it at next sample
+		self.samples.saveSample(self.SAMPLENAME, sample)
+
+class ProcStatsHandler:
+	def __init__(self, args, sysconfig, samples):
+		self.args = args
+		self.sysconfig = sysconfig
+		self.samples = samples
+
+		self.handlers = {
+			'cpuload': self.handleCpuload,
+			'vsize':   self.handleVSize,
+			'rss':     self.handleRss,
+		}
+
+	def handleCpuload(self, ts, sampleName, lastSample, sample):
+		cpuload = Helpers.computeCpuLoad(lastSample, sample, self.sysconfig)
+		self.samples.addSample(sampleName, ts, cpuload)
+
+	def handleVSize(self, ts, sampleName, lastSample, sample):
+		vsize = sample['vsize'] / 1024
+		self.samples.addSample(sampleName, ts, vsize)
+
+	def handleRss(self, ts, sampleName, lastSample, sample):
+		rss = sample['rss'] * self.sysconfig.pagesize / 1024
+		self.samples.addSample(sampleName, ts, rss)
+
+	def handleSample(self, sample):
+		ts = sample['ts']
+		sampleName = sample['name']
+
+		lastSample = self.samples.getLastSample(sampleName)
+		if not lastSample:
+			# At least two samples are required. Save the first one without
+			# any extra processing
+			self.samples.saveSample(sampleName, sample)
+			return
+
+		# Record sample requested by user
+		try:
+			handler = self.handlers[self.args.sample]
+		except KeyError:
+			print('Handled sample %s' % self.args.sample)
+
+		handler(ts, sampleName, lastSample, sample)
+
+		# Save sample to get it at next sample
+		self.samples.saveSample(sampleName, sample)
+
+class ParserEvtHandler:
+	def __init__(self, samples):
+		self.samples = samples
+		self.handlers = {}
+
+	def __call__(self, name, data):
+		try:
+			handler = self.handlers[name]
+		except KeyError:
+			# No handler, ignore sample
+			return
+
+		handler.handleSample(data)
+
+	def registerSectionHandler(self, name, handler):
+		try:
+			h = self.handlers[name]
+			raise Exception('Handler for section \'%s\' already exists' % name)
+		except KeyError:
+			self.handlers[name] = handler
+
+class SampleCollection:
+	def __init__(self):
+		self.samples = {}
+		self.lastSamples = {}
+		self.columns = ['ts']
+
+	def addSample(self, name, ts, value):
+		if not name in self.columns:
+			self.columns.append(name)
+
+		try:
+			tsEntry = self.samples[ts]
+		except KeyError:
+			tsEntry = {}
+			self.samples[ts] = tsEntry
+
+		tsEntry[name] = value
+
+	def saveSample(self, name, rawValue):
+		self.lastSamples[name] = rawValue
+
+	def getLastSample(self, name):
+		try:
+			return self.lastSamples[name]
+		except KeyError:
+			return None
+
+	def getColumns(self):
+		return self.columns
+
+	def getColumnsToDisplay(self):
+		# Build columns to display.
+		# Timestamp column is removed to force its position at the very
+		# beginning of the list.
+		columnsToDisplay = list(self.columns)
+		columnsToDisplay.remove('ts')
+
+		return columnsToDisplay
 
 	def getSamples(self):
 		ret = []
@@ -111,16 +202,23 @@ class SysstatsReader:
 		for ts in sorted(self.samples):
 			row = [ts]
 
-			sample = self.samples[ts]
-			for name in self.processList:
+			tsEntry = self.samples[ts]
+			for name in self.getColumnsToDisplay():
 				try:
-					row.append(sample[name])
-				except:
-					row.append(0)
+					row.append(tsEntry[name])
+				except KeyError:
+					row.append(None)
 
 			ret.append(row)
 
 		return ret
+
+	def printStats(self):
+		columns = self.getColumnsToDisplay()
+
+		print('%d columns' % len(columns))
+		for name in columns:
+			print('\t%s' % name)
 
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
@@ -133,6 +231,12 @@ def parseArgs():
 	return (parser, parser.parse_args())
 
 if __name__ == '__main__':
+	handlers = {
+		'systemstats':  lambda args, sysconfigHandler, outSamples: SystemStatsHandler(args, sysconfigHandler, outSamples),
+		'processstats': lambda args, sysconfigHandler, outSamples: ProcStatsHandler(args, sysconfigHandler, outSamples),
+		'threadstats':  lambda args, sysconfigHandler, outSamples: ProcStatsHandler(args, sysconfigHandler, outSamples),
+	}
+
 	(argParser, args) = parseArgs()
 
 	parser = Parser()
@@ -140,26 +244,47 @@ if __name__ == '__main__':
 
 	if args.header:
 		parser.printHeader()
-	else:
-		if not args.output:
-			argParser.print_help()
-			sys.exit(1)
+		sys.exit(1)
+	elif not args.output:
+		argParser.print_help()
+		sys.exit(1)
 
-		# Parse record file
-		reader = SysstatsReader(args.process, args.sample, args.struct)
-		parser.parse(reader)
+	# Create generic data
+	samples = SampleCollection()
+	evtHandler = ParserEvtHandler(samples)
 
-		# Generate html
-		sourcePath = os.path.dirname(os.path.abspath(__file__))
-		templateFile = open('%s/template.html' % sourcePath, 'r')
-		template = jinja2.Template(templateFile.read())
+	# Create generic section handlers
+	sysconfigHandler = SystemConfigHandler()
+	evtHandler.registerSectionHandler('systemconfig', sysconfigHandler)
 
-		columns = ['timestamp'] + reader.getProcessList()
-		html = template.render(sampleName=args.sample, columns=columns, samples=reader.getSamples())
+	acqDurationHandler = AcqDurationHandler()
+	evtHandler.registerSectionHandler('acqduration', acqDurationHandler)
 
-		# Write output file
-		out = open(args.output, 'w')
-		out.write(html)
+	# Create user-required handler
+	try:
+		handlerCreateCb = handlers[args.struct]
+	except KeyError:
+		print('Unhandled struct %s' % args.struct)
+		argParser.print_help()
+		sys.exit(1)
 
-		reader.printStats()
+	evtHandler.registerSectionHandler(args.struct, handlerCreateCb(args, sysconfigHandler, samples))
+
+	# Parse input file
+	parser.parse(evtHandler)
+
+	# Create output file
+	sourcePath = os.path.dirname(os.path.abspath(__file__))
+	templateFile = open('%s/template.html' % sourcePath, 'r')
+	template = jinja2.Template(templateFile.read())
+
+	html = template.render(sampleName=args.sample, columns=samples.getColumns(), samples=samples.getSamples())
+
+	# Write output file
+	out = open(args.output, 'w')
+	out.write(html)
+
+	# Display general stats
+	acqDurationHandler.printStats()
+	samples.printStats()
 

@@ -23,7 +23,7 @@
 		<script type="text/javascript">
 			data = [
 				{% for sample in samples %}
-					[ {% for column in sample %} {{ column }}, {% endfor %} ],
+					[ {% for cell in sample %} {% if cell is not none %} {{ cell }} {% else %} null {% endif %}, {% endfor %} ],
 				{% endfor %}
 			];
 
