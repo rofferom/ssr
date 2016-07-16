@@ -7,6 +7,7 @@ set(SYSTAT_CFILES
      src/main.cpp
      src/ProcFsTools.cpp
      src/ProcessMonitor.cpp
+     src/SysStatsMonitor.cpp
      src/SystemMonitor.cpp
      src/SystemRecorder.cpp)
 

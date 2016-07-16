@@ -11,6 +11,7 @@
 #include <map>
 
 #include "ProcessMonitor.hpp"
+#include "SysStatsMonitor.hpp"
 #include "SystemMonitor.hpp"
 #include "ProcFsTools.hpp"
 
@@ -37,7 +38,9 @@ class SystemMonitorImpl : public SystemMonitor {
 private:
 	Callbacks mCb;
 	SystemConfig mSysSettings;
-	std::list<ProcessMonitor *> mMonitors;
+
+	SysStatsMonitor mSysMonitor;
+	std::list<ProcessMonitor *> mProcMonitors;
 	uint64_t mLastProcess;
 
 public:
@@ -59,7 +62,7 @@ SystemMonitorImpl::SystemMonitorImpl(const Callbacks &cb) : SystemMonitor()
 
 SystemMonitorImpl::~SystemMonitorImpl()
 {
-	for (auto &m :mMonitors)
+	for (auto &m :mProcMonitors)
 		delete m;
 }
 
@@ -84,7 +87,7 @@ int SystemMonitorImpl::addProcess(const char *name)
 	if (!monitor)
 		return -ENOMEM;
 
-	mMonitors.push_back(monitor);
+	mProcMonitors.push_back(monitor);
 
 	return 0;
 }
@@ -100,8 +103,10 @@ int SystemMonitorImpl::process()
 	if (ret < 0)
 		return ret;
 
+	mSysMonitor.readRawStats();
+
 	// Start process monitors
-	for (auto m :mMonitors)
+	for (auto m :mProcMonitors)
 		m->readRawStats();
 
 	// Compute acquisition duration
@@ -113,7 +118,9 @@ int SystemMonitorImpl::process()
 		mCb.mAcquisitionDuration( { start, end }, mCb.mUserdata);
 
 	// Process fetched data
-	for (auto &m :mMonitors)
+	mSysMonitor.processRawStats(start, mCb);
+
+	for (auto &m :mProcMonitors)
 		m->processRawStats(start, mCb);
 
 	mLastProcess = start;

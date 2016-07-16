@@ -14,10 +14,11 @@ public:
 	};
 
 	struct SystemStats {
-		uint64_t mTs;
-		uint32_t mCpuLoad;
-		uint32_t mRamTotal;
-		uint32_t mRamUsed;
+		uint64_t    mTs;
+
+		uint64_t    mUtime;
+		uint64_t    mStime;
+		uint64_t    mIdleTime;
 	};
 
 	struct ProcessStats {
@@ -56,6 +57,15 @@ public:
 		void (*mAcquisitionDuration) (const AcquisitionDuration &stats, void *userdata);
 
 		void *mUserdata;
+
+		Callbacks()
+		{
+			mSystemStats = nullptr;
+			mProcessStats = nullptr;
+			mThreadStats = nullptr;
+			mAcquisitionDuration = nullptr;
+			mUserdata = nullptr;
+		}
 	};
 
 public:

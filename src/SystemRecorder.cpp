@@ -126,13 +126,13 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mTs, "ts");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mCpuLoad, "cpuload");
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mUtime, "utime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mRamTotal, "ramtotal");
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mStime, "stime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mRamUsed, "ramused");
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mIdleTime, "idletime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	mDescList[RECORD_TYPE_SYS_STATS] = desc;

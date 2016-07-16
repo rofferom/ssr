@@ -152,6 +152,18 @@ static void sighandler(int s)
 		printf("write() failed : %d(%m)\n", errno);
 }
 
+static void systemStatsCb(
+		const SystemMonitor::SystemStats &stats,
+		void *userdata)
+{
+	SystemRecorder *recorder = (SystemRecorder *) userdata;
+	int ret;
+
+	ret = recorder->record(stats);
+	if (ret < 0)
+		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+}
+
 static void processStatsCb(
 		const SystemMonitor::ProcessStats &stats,
 		void *userdata)
@@ -233,6 +245,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Create monitor
+	cb.mSystemStats = systemStatsCb;
 	cb.mProcessStats = processStatsCb;
 	cb.mThreadStats = threadStatsCb;
 	cb.mAcquisitionDuration = acquisitionDurationCb;

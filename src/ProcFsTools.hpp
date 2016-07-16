@@ -3,7 +3,7 @@
 
 #include "SystemMonitor.hpp"
 
-#define STAT_SIZE 1024
+#define STAT_SIZE 4096
 
 namespace pfstools {
 
@@ -16,6 +16,8 @@ struct RawStats {
 int findProcess(const char *name, int *outPid);
 
 int readRawStats(int fd, RawStats *stats);
+
+int readSystemStats(char *s, SystemMonitor::SystemStats *stats);
 
 int readProcessStats(const char *s, SystemMonitor::ProcessStats *stats);
 

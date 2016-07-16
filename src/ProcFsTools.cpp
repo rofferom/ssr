@@ -17,14 +17,20 @@ typedef bool (*TokenizerCb) (
 		const char *end,
 		void *userdata);
 
+enum SysStatIdx {
+	SYSSTAT_IDX_USER = 1,
+	SYSSTAT_IDX_SYSTEM = 3,
+	SYSSTAT_IDX_IDLE = 4,
+};
+
 enum ProcStatIdx {
-	STAT_IDX_PID = 0,
-	STAT_IDX_NAME = 1,
-	STAT_IDX_UTIME = 13,
-	STAT_IDX_STIME = 14,
-	STAT_IDX_THREADCOUNT= 19,
-	STAT_IDX_VSIZE = 22,
-	STAT_IDX_RSS = 23
+	PROCSTAT_IDX_PID = 0,
+	PROCSTAT_IDX_NAME = 1,
+	PROCSTAT_IDX_UTIME = 13,
+	PROCSTAT_IDX_STIME = 14,
+	PROCSTAT_IDX_THREADCOUNT= 19,
+	PROCSTAT_IDX_VSIZE = 22,
+	PROCSTAT_IDX_RSS = 23
 };
 
 enum ParserState {
@@ -122,31 +128,31 @@ bool processStatsCb(int idx,
 	buf[end - start + 1] = '\0';
 
 	switch (idx) {
-	case STAT_IDX_PID:
+	case PROCSTAT_IDX_PID:
 		stats->mPid = atoi(buf);
 		break;
 
-	case STAT_IDX_NAME:
+	case PROCSTAT_IDX_NAME:
 		strncpy(stats->mName, buf, sizeof(stats->mName));
 		break;
 
-	case STAT_IDX_UTIME:
+	case PROCSTAT_IDX_UTIME:
 		stats->mUtime = atoll(buf);
 		break;
 
-	case STAT_IDX_STIME:
+	case PROCSTAT_IDX_STIME:
 		stats->mStime = atoll(buf);
 		break;
 
-	case STAT_IDX_THREADCOUNT:
+	case PROCSTAT_IDX_THREADCOUNT:
 		stats->mThreadCount = atoi(buf);
 		break;
 
-	case STAT_IDX_VSIZE:
+	case PROCSTAT_IDX_VSIZE:
 		stats->mVsize = atoi(buf);
 		break;
 
-	case STAT_IDX_RSS:
+	case PROCSTAT_IDX_RSS:
 		stats->mRss = atoi(buf);
 		ret = false;
 		break;
@@ -174,19 +180,19 @@ bool threadStatsCb(int idx,
 	buf[end - start + 1] = '\0';
 
 	switch (idx) {
-	case STAT_IDX_PID:
+	case PROCSTAT_IDX_PID:
 		stats->mTid = atoi(buf);
 		break;
 
-	case STAT_IDX_NAME:
+	case PROCSTAT_IDX_NAME:
 		strncpy(stats->mName, buf, sizeof(stats->mName));
 		break;
 
-	case STAT_IDX_UTIME:
+	case PROCSTAT_IDX_UTIME:
 		stats->mUtime = atoll(buf);
 		break;
 
-	case STAT_IDX_STIME:
+	case PROCSTAT_IDX_STIME:
 		stats->mStime = atoll(buf);
 		ret = false;
 		break;
@@ -206,7 +212,7 @@ bool pidTestCb(int idx,
 	PidTestCtx *ctx = (PidTestCtx *) userdata;
 	char buf[64];
 
-	if (idx != STAT_IDX_NAME)
+	if (idx != PROCSTAT_IDX_NAME)
 		return true;
 
 	if ((size_t) (end - start + 1) > sizeof(buf))
@@ -255,6 +261,42 @@ bool testPidName(int pid, const char *name)
 	}
 
 	return testCtx.mMatch;
+}
+
+bool processCpuCb(int idx,
+		  const char *start,
+		  const char *end,
+		  void *userdata)
+{
+	auto stats = (SystemMonitor::SystemStats *) userdata;
+	char buf[64];
+	bool ret = true;
+
+	if ((size_t) (end - start + 1) > sizeof(buf))
+		return false;
+
+	memcpy(buf, start, end - start + 1);
+	buf[end - start + 1] = '\0';
+
+	switch (idx) {
+	case SYSSTAT_IDX_USER:
+		stats->mUtime = atoi(buf);
+		break;
+
+	case SYSSTAT_IDX_SYSTEM:
+		stats->mStime = atoi(buf);
+		break;
+
+	case SYSSTAT_IDX_IDLE:
+		stats->mIdleTime = atoi(buf);
+		ret = false;
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
 }
 
 } // anonymous namespace
@@ -340,6 +382,67 @@ int readRawStats(int fd, RawStats *stats)
 	// Remove trailing '\n'
 	stats->mContent[readRet - 1] = '\0';
 	stats->mPending = true;
+
+	return 0;
+}
+
+static int getNextLine(char *s, char **end, bool *endOfString)
+{
+	while (true) {
+		if (*s == '\n') {
+			*s = '\0';
+			*end = s;
+			*endOfString = false;
+			break;
+		} else if (*s == '\0') {
+			*end = s;
+			*endOfString = true;
+			break;
+		} else {
+			s++;
+		}
+	}
+
+	return 0;
+}
+
+int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
+{
+	TokenizerCb cb;
+	bool endOfString = false;
+	bool process = true;
+	char *end;
+	int ret;
+
+	enum {
+		LINE_CPU_GLOBAL = 0,
+	};
+
+	if (!s || !stats)
+		return -EINVAL;
+
+	for (int line = 0; process && !endOfString; line++) {
+		ret = getNextLine(s, &end, &endOfString);
+		if (ret < 0)
+			return ret;
+
+		cb = nullptr;
+		switch (line) {
+		case LINE_CPU_GLOBAL:
+			cb = processCpuCb;
+			process = false;
+			break;
+
+		}
+
+		if (cb) {
+			ret = tokenizeStats(s, processCpuCb, stats);
+			if (ret < 0)
+				return ret;
+		}
+
+		s = end + 1;
+	}
 
 	return 0;
 }
