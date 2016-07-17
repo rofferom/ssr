@@ -128,7 +128,7 @@ int SystemMonitorImpl::process()
 		mCb.mAcquisitionDuration(stats, mCb.mUserdata);
 
 	// Process fetched data
-	mSysMonitor.processRawStats(stats.mStart, mCb);
+	mSysMonitor.processRawStats(mCb);
 
 	for (auto &m :mProcMonitors)
 		m->processRawStats(mCb);

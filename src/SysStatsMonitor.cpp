@@ -27,9 +27,7 @@ int SysStatsMonitor::readRawStats()
 	return pfstools::readRawStats(mFd, &mRawStats);
 }
 
-int SysStatsMonitor::processRawStats(
-		uint64_t ts,
-		const SystemMonitor::Callbacks &cb)
+int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::SystemStats stats;
 	int ret;

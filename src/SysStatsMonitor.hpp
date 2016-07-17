@@ -13,7 +13,7 @@ public:
 	~SysStatsMonitor();
 
 	int readRawStats();
-	int processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb);
+	int processRawStats(const SystemMonitor::Callbacks &cb);
 
 };
 
