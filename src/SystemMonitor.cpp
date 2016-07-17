@@ -36,6 +36,7 @@ int getTimeNs(uint64_t *ns)
 
 class SystemMonitorImpl : public SystemMonitor {
 private:
+	Config mConfig;
 	Callbacks mCb;
 	SystemConfig mSysSettings;
 
@@ -43,7 +44,7 @@ private:
 	std::list<ProcessMonitor *> mProcMonitors;
 
 public:
-	SystemMonitorImpl(const Callbacks &cb);
+	SystemMonitorImpl(const Config &config, const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
 
 	virtual int readSystemConfig(SystemConfig *config);
@@ -51,8 +52,11 @@ public:
 	virtual int process();
 };
 
-SystemMonitorImpl::SystemMonitorImpl(const Callbacks &cb) : SystemMonitor()
+SystemMonitorImpl::SystemMonitorImpl(
+		const Config &config,
+		const Callbacks &cb) : SystemMonitor()
 {
+	mConfig = config;
 	mCb = cb;
 	mSysSettings.mClkTck = sysconf(_SC_CLK_TCK);
 	mSysSettings.mPagesize = getpagesize();
@@ -81,7 +85,7 @@ int SystemMonitorImpl::addProcess(const char *name)
 	if (!name)
 		return -EINVAL;
 
-	monitor = new ProcessMonitor(name, &mSysSettings);
+	monitor = new ProcessMonitor(name, &mConfig, &mSysSettings);
 	if (!monitor)
 		return -ENOMEM;
 
@@ -125,7 +129,7 @@ int SystemMonitorImpl::process()
 
 } // anonymous namespace
 
-SystemMonitor *SystemMonitor::create(const Callbacks &cb)
+SystemMonitor *SystemMonitor::create(const Config &config, const Callbacks &cb)
 {
-	return new SystemMonitorImpl(cb);
+	return new SystemMonitorImpl(config, cb);
 }

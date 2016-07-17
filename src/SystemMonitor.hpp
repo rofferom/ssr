@@ -66,6 +66,15 @@ public:
 		}
 	};
 
+	struct Config {
+		bool mRecordThreads;
+
+		Config()
+		{
+			mRecordThreads = true;
+		}
+	};
+
 public:
 	virtual ~SystemMonitor() {}
 
@@ -74,7 +83,7 @@ public:
 	virtual int addProcess(const char *name) = 0;
 	virtual int process() = 0;
 
-	static SystemMonitor *create(const Callbacks &cb);
+	static SystemMonitor *create(const Config &config, const Callbacks &cb);
 };
 
 #endif // !__SYSTEM_MONITOR_HPP__

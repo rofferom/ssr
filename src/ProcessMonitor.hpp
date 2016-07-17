@@ -17,6 +17,7 @@ private:
 	int mStatFd;
 	int mPid;
 	std::string mName;
+	const SystemMonitor::Config *mConfig;
 	const SystemMonitor::SystemConfig *mSysSettings;
 
 	pfstools::RawStats mRawStats;
@@ -34,8 +35,16 @@ private:
 	int researchThreads(uint64_t ts,
 			    const SystemMonitor::Callbacks &cb);
 
+	int readRawThreadsStats();
+
+	int processRawThreadsStats(
+			uint64_t ts,
+			int threadCount,
+			const SystemMonitor::Callbacks &cb);
+
 public:
 	ProcessMonitor(const char *name,
+		       const SystemMonitor::Config *config,
 		       const SystemMonitor::SystemConfig *sysSettings);
 
 	~ProcessMonitor();

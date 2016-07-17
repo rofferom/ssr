@@ -14,7 +14,6 @@
 #include "SystemRecorder.hpp"
 #include "SystemMonitor.hpp"
 
-
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
 static struct Context {
@@ -37,21 +36,15 @@ struct Params {
 	std::string output;
 	int period;
 	int duration;
+	int recordThreads;
 
 	Params()
 	{
 		help = false;
 		period = 1;
 		duration = -1;
+		recordThreads = true;
 	}
-};
-
-static const struct option argsOptions[] = {
-	{ "help"  , optional_argument, 0, 'h' },
-	{ "period", optional_argument, 0, 'p' },
-	{ "duration", optional_argument, 0, 'd' },
-	{ "output", required_argument, 0, 'o' },
-	{ 0, 0, 0}
 };
 
 static int readDecimalParam(int *out_v, const char *name)
@@ -86,6 +79,15 @@ int parseArgs(int argc, char *argv[], Params *params)
 	int optionIndex = 0;
 	int value;
 	int ret;
+
+	const struct option argsOptions[] = {
+		{ "help"  ,          optional_argument, 0, 'h' },
+		{ "period",          optional_argument, 0, 'p' },
+		{ "duration",        optional_argument, 0, 'd' },
+		{ "output",          required_argument, 0, 'o' },
+		{ "disable-threads", optional_argument, &params->recordThreads, 0 },
+		{ 0, 0, 0}
+	};
 
 	while (true) {
 		value = getopt_long(argc, argv, "ho:p:d:", argsOptions, &optionIndex);
@@ -138,6 +140,7 @@ void printUsage(int argc, char *argv[])
 	printf("  %-20s %s\n", "-p, --period", "sample acquisition period (seconds). Default : 1");
 	printf("  %-20s %s\n", "-d, --duration", "acquisition duration (seconds). Default : infinite");
 	printf("  %-20s %s\n", "-o, --output", "output record file");
+	printf("  %-20s %s\n", "--disable-threads", "disable threads recording");
 }
 
 static void sighandler(int s)
@@ -209,6 +212,7 @@ int main(int argc, char *argv[])
 	SystemMonitor::SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
 	SystemMonitor *mon = nullptr;
+	SystemMonitor::Config monConfig;
 	SystemRecorder *recorder = nullptr;
 	int ret;
 
@@ -250,7 +254,9 @@ int main(int argc, char *argv[])
 	cb.mAcquisitionDuration = acquisitionDurationCb;
 	cb.mUserdata = recorder;
 
-	mon = SystemMonitor::create(cb);
+	monConfig.mRecordThreads = params.recordThreads;
+
+	mon = SystemMonitor::create(monConfig, cb);
 	if (!mon)
 		goto error;
 
