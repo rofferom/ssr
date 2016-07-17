@@ -38,7 +38,6 @@ public:
 		uint32_t    mPid;
 		uint32_t    mTid;
 		char        mName[64];
-		uint16_t    mCpuLoad;
 
 		uint64_t    mUtime;
 		uint64_t    mStime;

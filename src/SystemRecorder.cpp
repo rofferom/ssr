@@ -191,9 +191,6 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_STRING(&desc->mDesc, SystemMonitor::ThreadStats, mName, "name");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mCpuLoad, "cpuload");
-	RETURN_IF_REGISTER_FAILED(ret);
-
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mUtime, "utime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
