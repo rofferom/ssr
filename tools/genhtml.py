@@ -35,6 +35,10 @@ class Helpers:
 
 		return Helpers.computeLoad(ticks, duration, sysconfig)
 
+class ProgParamsHandler:
+	def handleSample(self, data):
+		print('File recorded with params %s' % data['params'])
+
 class SystemConfigHandler:
 	def __init__(self):
 		self.clkTck   = None
@@ -254,6 +258,9 @@ if __name__ == '__main__':
 	evtHandler = ParserEvtHandler(samples)
 
 	# Create generic section handlers
+	progParamsHandler = ProgParamsHandler()
+	evtHandler.registerSectionHandler('programparameters', progParamsHandler)
+
 	sysconfigHandler = SystemConfigHandler()
 	evtHandler.registerSectionHandler('systemconfig', sysconfigHandler)
 

@@ -3,6 +3,10 @@
 
 #include "SystemMonitor.hpp"
 
+struct ProgramParameters {
+	char mParams[1024];
+};
+
 class SystemRecorder {
 public:
 	virtual ~SystemRecorder() {}
@@ -12,6 +16,7 @@ public:
 
 	virtual int flush() = 0;
 
+	virtual int record(const struct ProgramParameters &params) = 0;
 	virtual int record(const SystemMonitor::SystemConfig &config) = 0;
 	virtual int record(const SystemMonitor::SystemStats &stats) = 0;
 	virtual int record(const SystemMonitor::ProcessStats &stats) = 0;

@@ -203,12 +203,25 @@ static void acquisitionDurationCb(
 		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
 }
 
+static void buildProgParameters(int argc, char *argv[], ProgramParameters *out)
+{
+	std::string s;
+
+	s = argv[0];
+
+	for (int i = 1; i < argc; i++)
+		s += std::string(" ") + std::string(argv[i]);
+
+	snprintf(out->mParams, sizeof(out->mParams), "%s", s.c_str());
+}
+
 int main(int argc, char *argv[])
 {
 	struct itimerspec timer;
 	struct pollfd fds[3];
 	int fdsCount;
 	Params params;
+	ProgramParameters progParameters;
 	SystemMonitor::SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
 	SystemMonitor *mon = nullptr;
@@ -270,6 +283,10 @@ int main(int argc, char *argv[])
 	}
 
 	mon->loadProcesses();
+
+	// Write program parameters
+	buildProgParameters(argc, argv, &progParameters);
+	recorder->record(progParameters);
 
 	// Write system config
 	ret = mon->readSystemConfig(&systemConfig);

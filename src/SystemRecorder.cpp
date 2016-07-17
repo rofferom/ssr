@@ -33,7 +33,8 @@ namespace {
  */
 
 enum RecordType : uint8_t {
-	RECORD_TYPE_SYS_CONFIG = 0,
+	RECORD_TYPE_PROG_PARAMS = 0,
+	RECORD_TYPE_SYS_CONFIG,
 	RECORD_TYPE_SYS_STATS,
 	RECORD_TYPE_PROCESS_STATS,
 	RECORD_TYPE_THREAD_STATS,
@@ -69,6 +70,7 @@ public:
 
 	virtual int flush();
 
+	virtual int record(const struct ProgramParameters &params);
 	virtual int record(const SystemMonitor::SystemConfig &config);
 	virtual int record(const SystemMonitor::SystemStats &stats);
 	virtual int record(const SystemMonitor::ProcessStats &stats);
@@ -98,6 +100,19 @@ int SystemRecorderImpl::initDescs()
 	StructDescInternal *desc;
 	int ret;
 
+	// ProgramParameters
+	desc = new StructDescInternal();
+	if (!desc)
+		return -ENOMEM;
+
+	desc->mName = "programparameters";
+
+	ret = REGISTER_STRING(&desc->mDesc, ProgramParameters, mParams, "params");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	mDescList[RECORD_TYPE_PROG_PARAMS] = desc;
+	desc = nullptr;
+
 	// SystemConfig
 	desc = new StructDescInternal();
 	if (!desc)
@@ -114,7 +129,6 @@ int SystemRecorderImpl::initDescs()
 
 	mDescList[RECORD_TYPE_SYS_CONFIG] = desc;
 	desc = nullptr;
-
 
 	// SystemStats
 	desc = new StructDescInternal();
@@ -324,6 +338,19 @@ int SystemRecorderImpl::flush()
 		printf("fflush() failed : %d(%m)\n", errno);
 		return ret;
 	}
+
+	return 0;
+}
+
+int SystemRecorderImpl::record(const struct ProgramParameters &params)
+{
+	int ret;
+
+	ret = ValueTrait<uint8_t>::write(mSink, RECORD_TYPE_PROG_PARAMS);
+	RETURN_IF_WRITE_FAILED(ret);
+
+	ret = mDescList[RECORD_TYPE_PROG_PARAMS]->mDesc.writeValue(mSink, &params);
+	RETURN_IF_WRITE_FAILED(ret);
 
 	return 0;
 }
