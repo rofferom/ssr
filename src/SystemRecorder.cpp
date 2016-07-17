@@ -163,9 +163,6 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mThreadCount, "threadcount");
 	RETURN_IF_REGISTER_FAILED(ret);
 
-	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mFdCount, "fdcount");
-	RETURN_IF_REGISTER_FAILED(ret);
-
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mUtime, "utime");
 	RETURN_IF_REGISTER_FAILED(ret);
 

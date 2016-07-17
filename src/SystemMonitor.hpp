@@ -28,7 +28,6 @@ public:
 		uint32_t    mVsize;
 		uint32_t    mRss;
 		uint16_t    mThreadCount;
-		uint16_t    mFdCount;
 
 		uint64_t    mUtime;
 		uint64_t    mStime;
