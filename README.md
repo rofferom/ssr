@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/rofferom/sysstatsrec.svg?branch=master)](https://travis-ci.org/rofferom/sysstatsrec)
+[![Build Status](https://travis-ci.org/rofferom/ssr.svg?branch=master)](https://travis-ci.org/rofferom/ssr)
 
 # System statistics recorder
 

@@ -5,7 +5,7 @@ import os
 import sys
 import argparse
 import jinja2
-from sysstatsrec.parser import Parser
+from ssr.parser import Parser
 
 DEFAULT_STRUCTNAME = 'processstats'
 DEFAULT_SAMPLENAME = 'cpuload'
