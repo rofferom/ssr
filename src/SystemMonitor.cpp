@@ -41,7 +41,6 @@ private:
 
 	SysStatsMonitor mSysMonitor;
 	std::list<ProcessMonitor *> mProcMonitors;
-	uint64_t mLastProcess;
 
 public:
 	SystemMonitorImpl(const Callbacks &cb);
@@ -57,7 +56,6 @@ SystemMonitorImpl::SystemMonitorImpl(const Callbacks &cb) : SystemMonitor()
 	mCb = cb;
 	mSysSettings.mClkTck = sysconf(_SC_CLK_TCK);
 	mSysSettings.mPagesize = getpagesize();
-	mLastProcess = 0;
 }
 
 SystemMonitorImpl::~SystemMonitorImpl()
@@ -94,12 +92,11 @@ int SystemMonitorImpl::addProcess(const char *name)
 
 int SystemMonitorImpl::process()
 {
-	uint64_t start = 0;
-	uint64_t end = 0;
+	AcquisitionDuration stats;
 	int ret;
 
 	// Compute delay between two calls
-	ret = getTimeNs(&start);
+	ret = getTimeNs(&stats.mStart);
 	if (ret < 0)
 		return ret;
 
@@ -110,20 +107,18 @@ int SystemMonitorImpl::process()
 		m->readRawStats();
 
 	// Compute acquisition duration
-	ret = getTimeNs(&end);
+	ret = getTimeNs(&stats.mEnd);
 	if (ret < 0)
 		return ret;
 
 	if (mCb.mAcquisitionDuration)
-		mCb.mAcquisitionDuration( { start, end }, mCb.mUserdata);
+		mCb.mAcquisitionDuration(stats, mCb.mUserdata);
 
 	// Process fetched data
-	mSysMonitor.processRawStats(start, mCb);
+	mSysMonitor.processRawStats(stats.mStart, mCb);
 
 	for (auto &m :mProcMonitors)
-		m->processRawStats(start, mCb);
-
-	mLastProcess = start;
+		m->processRawStats(stats.mStart, mCb);
 
 	return 0;
 }
