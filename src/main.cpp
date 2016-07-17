@@ -341,6 +341,10 @@ int main(int argc, char *argv[])
 		fds[2].revents = 0;
 
 		fdsCount++;
+	} else {
+		fds[2].fd = -1;
+		fds[2].events = 0;
+		fds[2].revents = 0;
 	}
 
 	// Start poll
