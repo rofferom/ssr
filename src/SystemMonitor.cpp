@@ -49,6 +49,7 @@ public:
 
 	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
+	virtual int loadProcesses();
 	virtual int process();
 };
 
@@ -94,6 +95,14 @@ int SystemMonitorImpl::addProcess(const char *name)
 	return 0;
 }
 
+int SystemMonitorImpl::loadProcesses()
+{
+	for (auto m :mProcMonitors)
+		m->init();
+
+	return 0;
+}
+
 int SystemMonitorImpl::process()
 {
 	AcquisitionDuration stats;
@@ -122,7 +131,7 @@ int SystemMonitorImpl::process()
 	mSysMonitor.processRawStats(stats.mStart, mCb);
 
 	for (auto &m :mProcMonitors)
-		m->processRawStats(stats.mStart, mCb);
+		m->processRawStats(mCb);
 
 	return 0;
 }

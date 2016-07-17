@@ -269,6 +269,8 @@ int main(int argc, char *argv[])
 
 	}
 
+	mon->loadProcesses();
+
 	// Write system config
 	ret = mon->readSystemConfig(&systemConfig);
 	if (ret < 0) {

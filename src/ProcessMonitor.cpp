@@ -23,28 +23,10 @@ ProcessMonitor::ProcessMonitor(const char *name,
 
 ProcessMonitor::~ProcessMonitor()
 {
-	clear();
+	cleanProcessAndThreadsFd();
 }
 
-void ProcessMonitor::clear()
-{
-	if (mStatFd != -1) {
-		close(mStatFd);
-		mStatFd = -1;
-	}
-
-	mPid = INVALID_PID;
-
-	for (auto p : mThreads)
-		close(p.second.mFd);
-
-	mThreads.clear();
-}
-
-int ProcessMonitor::addAndProcessThread(
-		uint64_t ts,
-		int tid,
-		const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::addNewThread(int tid)
 {
 	pfstools::RawStats rawStats;
 	SystemMonitor::ThreadStats stats;
@@ -52,7 +34,7 @@ int ProcessMonitor::addAndProcessThread(
 	char path[128];
 	int ret;
 
-	// Fill thread info
+	// Open thread fd
 	snprintf(path, sizeof(path),
 		 "/proc/%d/task/%d/stat",
 		 mPid, tid);
@@ -67,6 +49,7 @@ int ProcessMonitor::addAndProcessThread(
 	info.mTid = tid;
 	info.mFd = ret;
 
+	// Read stats to get its name
 	ret = pfstools::readRawStats(info.mFd, &rawStats);
 	if (ret < 0) {
 		close(info.mFd);
@@ -82,6 +65,9 @@ int ProcessMonitor::addAndProcessThread(
 		 tid,
 		 stats.mName);
 
+	printf("Found new thread %s for process %s\n",
+	       info.mName, mName.c_str());
+
 	// Register thread
 	auto insertRet = mThreads.insert( {tid, info} );
 	if (!insertRet.second) {
@@ -90,20 +76,10 @@ int ProcessMonitor::addAndProcessThread(
 		return -EPERM;
 	}
 
-	// Notify thread stats
-	stats.mTs = ts;
-	strncpy(stats.mName, info.mName, sizeof(stats.mName));
-	stats.mPid = mPid;
-
-	if (cb.mThreadStats)
-		cb.mThreadStats(stats, cb.mUserdata);
-
 	return 0;
 }
 
-int ProcessMonitor::researchThreads(
-		uint64_t ts,
-		const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::findNewThreads()
 {
 	DIR *d;
 	struct dirent entry;
@@ -143,7 +119,7 @@ int ProcessMonitor::researchThreads(
 
 		// Avoid to add thread if already exists
 		if (mThreads.count(tid) == 0) {
-			ret = addAndProcessThread(ts, tid, cb);
+			ret = addNewThread(tid);
 			if (ret < 0)
 				printf("Fail to add thread %d\n", tid);
 		}
@@ -171,21 +147,19 @@ int ProcessMonitor::readRawThreadsStats()
 	return 0;
 }
 
-int ProcessMonitor::processRawThreadsStats(
-		uint64_t ts,
-		int threadCount,
-		const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::processRawThreadsStats(const SystemMonitor::Callbacks &cb)
 {
-	int foundThreads;
+	std::list<std::map<int, ThreadInfo>::iterator> removeList;
 	SystemMonitor::ThreadStats threadStats;
 	int ret;
 
-	foundThreads = 0;
-	for (auto &thread : mThreads) {
-		ThreadInfo *threadInfo = &thread.second;
+	for (auto i = mThreads.begin(); i != mThreads.end(); i++) {
+		ThreadInfo *threadInfo = &i->second;
 
-		if (!threadInfo->mRawStats.mPending)
+		if (!threadInfo->mRawStats.mPending) {
+			removeList.push_back(i);
 			continue;
+		}
 
 		ret = pfstools::readThreadStats(threadInfo->mRawStats.mContent,
 						&threadStats);
@@ -202,14 +176,66 @@ int ProcessMonitor::processRawThreadsStats(
 
 			cb.mThreadStats(threadStats, cb.mUserdata);
 		}
-
-		foundThreads++;
 	}
 
-	if (foundThreads != threadCount)
-		researchThreads(ts, cb);
+	// Clean thread that haven't been found
+	for (auto &i :removeList)
+		mThreads.erase(i);
 
 	return 0;
+}
+
+int ProcessMonitor::openProcessAndThreadsFd()
+{
+	char path[64];
+	int ret;
+
+	// Open thread
+	ret = pfstools::findProcess(mName.c_str(), &mPid);
+	if (ret < 0)
+		return ret;
+
+	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
+
+	mStatFd = open(path, O_RDONLY|O_CLOEXEC);
+	if (mStatFd == -1) {
+		ret = -errno;
+		printf("Fail to open %s : %d(%m)\n", path, errno);
+		return ret;
+	}
+
+	printf("Found process '%s' : pid %d\n", mName.c_str(), mPid);
+
+	// Find threads
+	if (mConfig->mRecordThreads) {
+		ret = findNewThreads();
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+int ProcessMonitor::cleanProcessAndThreadsFd()
+{
+	mPid = INVALID_PID;
+
+	// Close process fd
+	close(mStatFd);
+	mStatFd = -1;
+
+	// Close threads fd
+	for (auto p : mThreads)
+		close(p.second.mFd);
+
+	mThreads.clear();
+
+	return 0;
+}
+
+int ProcessMonitor::init()
+{
+	return openProcessAndThreadsFd();
 }
 
 int ProcessMonitor::readRawStats()
@@ -217,27 +243,15 @@ int ProcessMonitor::readRawStats()
 	int ret;
 
 	if (mPid == INVALID_PID) {
-		char path[64];
-
-		ret = pfstools::findProcess(mName.c_str(), &mPid);
-		if (ret < 0)
-			return ret;
-
-		snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
-
-		mStatFd = open(path, O_RDONLY|O_CLOEXEC);
-		if (mStatFd == -1) {
-			ret = -errno;
-			printf("Fail to open %s : %d(%m)\n", path, errno);
-			return ret;
-		}
+		mRawStats.mPending = false;
+		return 0;
 	}
 
 	// Read process stats
 	ret = pfstools::readRawStats(mStatFd, &mRawStats);
 	if (ret < 0) {
-		close(mStatFd);
-		mStatFd = -1;
+		printf("Process %s has stopped\n", mName.c_str());
+		cleanProcessAndThreadsFd();
 		return ret;
 	}
 
@@ -248,58 +262,36 @@ int ProcessMonitor::readRawStats()
 	return 0;
 }
 
-int ProcessMonitor::processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb)
+int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::ProcessStats processStats;
 	int ret;
 
-	if (!mRawStats.mPending)
-		return 0;
+	// Acquisition has failed. This means the process is currently not
+	// known.
+	if (!mRawStats.mPending) {
+		ret = openProcessAndThreadsFd();
+	} else {
+		ret = pfstools::readProcessStats(mRawStats.mContent,
+						 &processStats);
+		if (ret < 0)
+			return ret;
 
-	ret = pfstools::readProcessStats(mRawStats.mContent, &processStats);
-	if (ret < 0)
-		return ret;
+		if (cb.mProcessStats) {
+			processStats.mTs = mRawStats.mTs;
+			cb.mProcessStats(processStats, cb.mUserdata);
+		}
 
-	if (cb.mProcessStats) {
-		processStats.mTs = mRawStats.mTs;
-		cb.mProcessStats(processStats, cb.mUserdata);
+		// Process threads only if requested
+		if (mConfig->mRecordThreads) {
+			ret = processRawThreadsStats(cb);
+			if (ret < 0)
+				return ret;
+
+			if (mThreads.size() != processStats.mThreadCount)
+				findNewThreads();
+		}
 	}
 
-	// Process threads only if requested
-	if (mConfig->mRecordThreads)
-		processRawThreadsStats(ts, processStats.mThreadCount, cb);
-
-	return 0;
-}
-
-int ProcessMonitor::getPidFdCount()
-{
-	DIR *d;
-	struct dirent entry;
-	struct dirent *result = nullptr;
-	char path[64];
-	int ret;
-	bool found = false;
-	int count = 0;
-
-	snprintf(path, sizeof(path), "/proc/%d/fd", mPid);
-
-	d = opendir(path);
-	if (!d) {
-		ret = -errno;
-		printf("Fail to open /proc : %d(%m)\n", errno);
-		return ret;
-	}
-
-	while (!found) {
-		ret = readdir_r(d, &entry, &result);
-		if (ret == 0 && !result)
-			break;
-
-		count++;
-	}
-
-	closedir(d);
-
-	return count;
+	return ret;
 }

@@ -25,22 +25,17 @@ private:
 	std::map<int, ThreadInfo> mThreads;
 
 private:
-	void clear();
+	int openProcessAndThreadsFd();
 
-	int getPidFdCount();
+	int cleanProcessAndThreadsFd();
 
-	int addAndProcessThread(uint64_t ts, int tid,
-				const SystemMonitor::Callbacks &cb);
+	int addNewThread(int tid);
 
-	int researchThreads(uint64_t ts,
-			    const SystemMonitor::Callbacks &cb);
+	int findNewThreads();
 
 	int readRawThreadsStats();
 
-	int processRawThreadsStats(
-			uint64_t ts,
-			int threadCount,
-			const SystemMonitor::Callbacks &cb);
+	int processRawThreadsStats(const SystemMonitor::Callbacks &cb);
 
 public:
 	ProcessMonitor(const char *name,
@@ -49,8 +44,9 @@ public:
 
 	~ProcessMonitor();
 
+	int init();
 	int readRawStats();
-	int processRawStats(uint64_t ts, const SystemMonitor::Callbacks &cb);
+	int processRawStats(const SystemMonitor::Callbacks &cb);
 
 	const char *getName() const { return mName.c_str(); }
 };

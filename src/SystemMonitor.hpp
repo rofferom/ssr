@@ -81,6 +81,8 @@ public:
 	virtual int readSystemConfig(SystemConfig *config) = 0;
 
 	virtual int addProcess(const char *name) = 0;
+
+	virtual int loadProcesses() = 0;
 	virtual int process() = 0;
 
 	static SystemMonitor *create(const Config &config, const Callbacks &cb);
