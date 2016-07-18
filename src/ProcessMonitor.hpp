@@ -1,6 +1,7 @@
 #ifndef __PROCESS_MONITOR_HPP__
 #define __PROCESS_MONITOR_HPP__
 
+#include <string>
 #include "ProcFsTools.hpp"
 
 class ProcessMonitor {
