@@ -19,8 +19,12 @@ typedef bool (*TokenizerCb) (
 
 enum SysStatIdx {
 	SYSSTAT_IDX_USER = 1,
+	SYSSTAT_IDX_NICE = 2,
 	SYSSTAT_IDX_SYSTEM = 3,
 	SYSSTAT_IDX_IDLE = 4,
+	SYSSTAT_IDX_IOWAIT = 5,
+	SYSSTAT_IDX_IRQ = 6,
+	SYSSTAT_IDX_SOFTIRQ = 7,
 };
 
 enum ProcStatIdx {
@@ -283,12 +287,28 @@ bool processCpuCb(int idx,
 		stats->mUtime = atoi(buf);
 		break;
 
+	case SYSSTAT_IDX_NICE:
+		stats->mNice = atoi(buf);
+		break;
+
 	case SYSSTAT_IDX_SYSTEM:
 		stats->mStime = atoi(buf);
 		break;
 
 	case SYSSTAT_IDX_IDLE:
-		stats->mIdleTime = atoi(buf);
+		stats->mIdle = atoi(buf);
+		break;
+
+	case SYSSTAT_IDX_IOWAIT:
+		stats->mIoWait = atoi(buf);
+		break;
+
+	case SYSSTAT_IDX_IRQ:
+		stats->mIrq = atoi(buf);
+		break;
+
+	case SYSSTAT_IDX_SOFTIRQ:
+		stats->mSoftIrq = atoi(buf);
 		ret = false;
 		break;
 

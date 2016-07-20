@@ -20,17 +20,19 @@ class Helpers:
 		return cpuload
 
 	@staticmethod
-	def computeCpuLoad(prevSample, curSample, sysconfig):
-		ticks = curSample['utime'] + curSample['stime']
-		ticks -= prevSample['utime'] + prevSample['stime']
+	def computeTicks(prevSample, curSample, keyList):
+		ticks = 0
+		for key in keyList:
+			ticks += curSample[key]
 
-		duration = curSample['ts'] - prevSample['ts']
+		for key in keyList:
+			ticks -= prevSample[key]
 
-		return Helpers.computeLoad(ticks, duration, sysconfig)
+		return ticks
 
 	@staticmethod
-	def computeIdleLoad(prevSample, curSample, sysconfig):
-		ticks = curSample['idletime'] - prevSample['idletime']
+	def computeCpuLoad(prevSample, curSample, sysconfig, keyList):
+		ticks = Helpers.computeTicks(prevSample, curSample, keyList)
 		duration = curSample['ts'] - prevSample['ts']
 
 		return Helpers.computeLoad(ticks, duration, sysconfig)
@@ -57,7 +59,7 @@ class AcqDurationHandler:
 
 	def handleSample(self, sample):
 		acqTime = (sample['end'] - sample['start']) / 1000
-		print('ts %u - Acquisition took %6u us' % (sample['start'], acqTime))
+#		print('ts %u - Acquisition took %6u us' % (sample['start'], acqTime))
 
 		self.totalAcqTime += acqTime
 		self.sampleCount += 1
@@ -68,8 +70,8 @@ class AcqDurationHandler:
 
 class SystemStatsHandler:
 	SAMPLENAME = 'systemstats'
-
 	def __init__(self, args, sysconfig, samples):
+
 		self.args = args
 		self.sysconfig = sysconfig
 		self.samples = samples
@@ -85,11 +87,20 @@ class SystemStatsHandler:
 			return
 
 		# Record samples for display
-		cpuload = Helpers.computeCpuLoad(lastSample, sample, self.sysconfig)
-		self.samples.addSample('cpuload', ts, cpuload)
+		totalKeyList = ['utime', 'nice', 'stime', 'irq', 'softirq', 'idle', 'iowait']
+		totalTicks = Helpers.computeTicks(lastSample, sample, totalKeyList)
 
-		idleload = Helpers.computeIdleLoad(lastSample, sample, self.sysconfig)
-		self.samples.addSample('idle', ts, idleload)
+		loadKeyList = ['utime', 'nice', 'stime', 'irq', 'softirq']
+		loadTicks = Helpers.computeTicks(lastSample, sample, loadKeyList)
+
+		idleKeyList = ['idle', 'iowait']
+		idleTicks = Helpers.computeTicks(lastSample, sample, idleKeyList)
+
+		idle = (float(idleTicks) / float(totalTicks)) * 100
+		self.samples.addSample('idle', ts, idle)
+
+		load = (float(loadTicks) / float(totalTicks)) * 100
+		self.samples.addSample('load', ts, load)
 
 		# Save sample to get it at next sample
 		self.samples.saveSample(self.SAMPLENAME, sample)
@@ -107,7 +118,8 @@ class ProcStatsHandler:
 		}
 
 	def handleCpuload(self, ts, sampleName, lastSample, sample):
-		cpuload = Helpers.computeCpuLoad(lastSample, sample, self.sysconfig)
+		keyList = ['utime', 'stime']
+		cpuload = Helpers.computeCpuLoad(lastSample, sample, self.sysconfig, keyList)
 		self.samples.addSample(sampleName, ts, cpuload)
 
 	def handleVSize(self, ts, sampleName, lastSample, sample):

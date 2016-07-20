@@ -17,8 +17,12 @@ public:
 		uint64_t    mTs;
 
 		uint64_t    mUtime;
+		uint64_t    mNice;
 		uint64_t    mStime;
-		uint64_t    mIdleTime;
+		uint64_t    mIdle;
+		uint64_t    mIoWait;
+		uint64_t    mIrq;
+		uint64_t    mSoftIrq;
 	};
 
 	struct ProcessStats {
