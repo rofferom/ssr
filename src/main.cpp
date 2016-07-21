@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/eventfd.h>
 #include <sys/timerfd.h>
+#include <sys/stat.h>
 
 #include <string>
 
@@ -215,12 +216,35 @@ static void buildProgParameters(int argc, char *argv[], ProgramParameters *out)
 	snprintf(out->mParams, sizeof(out->mParams), "%s", s.c_str());
 }
 
+static bool getOutputPath(const std::string &basePath, std::string *outPath)
+{
+	struct stat st;
+	char path[128];
+	int ret;
+	bool found = false;
+
+	for (int i = 0; i < 100; i++) {
+		snprintf(path, sizeof(path), "%s-%02d.log",
+			 basePath.c_str(), i);
+
+		ret = stat(path, &st);
+		if (ret == -1 && errno == ENOENT) {
+			found = true;
+			*outPath = path;
+			break;
+		}
+	}
+
+	return found;
+}
+
 int main(int argc, char *argv[])
 {
 	struct itimerspec timer;
 	struct pollfd fds[3];
 	int fdsCount;
 	Params params;
+	std::string outputPath;
 	ProgramParameters progParameters;
 	SystemMonitor::SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
@@ -256,7 +280,13 @@ int main(int argc, char *argv[])
 	if (!recorder)
 		goto error;
 
-	ret = recorder->open(params.output.c_str());
+	if (!getOutputPath(params.output, &outputPath)) {
+		printf("Can find a new output file path\n");
+		return 1;
+	}
+
+	printf("Recording in file %s\n", outputPath.c_str());
+	ret = recorder->open(outputPath.c_str());
 	if (ret < 0)
 		goto error;
 
