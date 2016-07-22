@@ -3,7 +3,7 @@
 
 #include "SystemMonitor.hpp"
 
-#define STAT_SIZE 4096
+#define STAT_SIZE 4096*2
 
 namespace pfstools {
 

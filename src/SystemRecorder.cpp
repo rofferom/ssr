@@ -161,6 +161,15 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mSoftIrq, "softirq");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mIrqCount, "irqcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mSoftIrqCount, "softirqcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mCtxSwitchCount, "ctxswitchcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	mDescList[RECORD_TYPE_SYS_STATS] = desc;
 	desc = nullptr;
 

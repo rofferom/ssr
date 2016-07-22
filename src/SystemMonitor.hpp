@@ -16,6 +16,7 @@ public:
 	struct SystemStats {
 		uint64_t    mTs;
 
+		// Durations
 		uint64_t    mUtime;
 		uint64_t    mNice;
 		uint64_t    mStime;
@@ -23,6 +24,11 @@ public:
 		uint64_t    mIoWait;
 		uint64_t    mIrq;
 		uint64_t    mSoftIrq;
+
+		// Occurences
+		uint64_t    mIrqCount;
+		uint64_t    mSoftIrqCount;
+		uint64_t    mCtxSwitchCount;
 	};
 
 	struct ProcessStats {

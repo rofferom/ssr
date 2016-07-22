@@ -9,6 +9,8 @@
 
 #include "ProcFsTools.hpp"
 
+#define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
+
 namespace {
 
 typedef bool (*TokenizerCb) (
@@ -17,14 +19,34 @@ typedef bool (*TokenizerCb) (
 		const char *end,
 		void *userdata);
 
-enum SysStatIdx {
-	SYSSTAT_IDX_USER = 1,
-	SYSSTAT_IDX_NICE = 2,
-	SYSSTAT_IDX_SYSTEM = 3,
-	SYSSTAT_IDX_IDLE = 4,
-	SYSSTAT_IDX_IOWAIT = 5,
-	SYSSTAT_IDX_IRQ = 6,
-	SYSSTAT_IDX_SOFTIRQ = 7,
+enum SysStatLine {
+	SYSSTAT_UNKNOWN,
+	SYSSTAT_LINE_CPU,
+	SYSSTAT_IRQ,
+	SYSSTAT_SOFT_IRQ,
+	SYSSTAT_CTX_SWITCH,
+};
+
+enum SysStatCpuIdx {
+	SYSSTAT_CPU_IDX_USER = 1,
+	SYSSTAT_CPU_IDX_NICE = 2,
+	SYSSTAT_CPU_IDX_SYSTEM = 3,
+	SYSSTAT_CPU_IDX_IDLE = 4,
+	SYSSTAT_CPU_IDX_IOWAIT = 5,
+	SYSSTAT_CPU_IDX_IRQ = 6,
+	SYSSTAT_CPU_IDX_SOFTIRQ = 7,
+};
+
+enum SysStatIrqIdx {
+	SYSSTAT_IRQ_IDX_COUNT = 1
+};
+
+enum SysStatSoftIrqIdx {
+	SYSSTAT_SOFTIRQ_IDX_COUNT = 1
+};
+
+enum SysStatCtxSwitchIdx {
+	SYSSTAT_CTXSWITCH_COUNT = 1
 };
 
 enum ProcStatIdx {
@@ -283,32 +305,116 @@ bool processCpuCb(int idx,
 	buf[end - start + 1] = '\0';
 
 	switch (idx) {
-	case SYSSTAT_IDX_USER:
+	case SYSSTAT_CPU_IDX_USER:
 		stats->mUtime = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_NICE:
+	case SYSSTAT_CPU_IDX_NICE:
 		stats->mNice = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_SYSTEM:
+	case SYSSTAT_CPU_IDX_SYSTEM:
 		stats->mStime = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_IDLE:
+	case SYSSTAT_CPU_IDX_IDLE:
 		stats->mIdle = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_IOWAIT:
+	case SYSSTAT_CPU_IDX_IOWAIT:
 		stats->mIoWait = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_IRQ:
+	case SYSSTAT_CPU_IDX_IRQ:
 		stats->mIrq = atoi(buf);
 		break;
 
-	case SYSSTAT_IDX_SOFTIRQ:
+	case SYSSTAT_CPU_IDX_SOFTIRQ:
 		stats->mSoftIrq = atoi(buf);
+		ret = false;
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+bool processIrqCountCb(int idx,
+		       const char *start,
+		       const char *end,
+		       void *userdata)
+{
+	auto stats = (SystemMonitor::SystemStats *) userdata;
+	char buf[64];
+	bool ret = true;
+
+	if ((size_t) (end - start + 1) > sizeof(buf))
+		return false;
+
+	memcpy(buf, start, end - start + 1);
+	buf[end - start + 1] = '\0';
+
+	switch (idx) {
+	case SYSSTAT_IRQ_IDX_COUNT:
+		stats->mIrqCount = atoi(buf);
+		ret = false;
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+bool processSoftIrqCountCb(int idx,
+			   const char *start,
+			   const char *end,
+			   void *userdata)
+{
+	auto stats = (SystemMonitor::SystemStats *) userdata;
+	char buf[64];
+	bool ret = true;
+
+	if ((size_t) (end - start + 1) > sizeof(buf))
+		return false;
+
+	memcpy(buf, start, end - start + 1);
+	buf[end - start + 1] = '\0';
+
+	switch (idx) {
+	case SYSSTAT_SOFTIRQ_IDX_COUNT:
+		stats->mSoftIrqCount = atoi(buf);
+		ret = false;
+		break;
+
+	default:
+		break;
+	}
+
+	return ret;
+}
+
+bool processCtxSwitchCountCb(int idx,
+			     const char *start,
+			     const char *end,
+			     void *userdata)
+{
+	auto stats = (SystemMonitor::SystemStats *) userdata;
+	char buf[64];
+	bool ret = true;
+
+	if ((size_t) (end - start + 1) > sizeof(buf))
+		return false;
+
+	memcpy(buf, start, end - start + 1);
+	buf[end - start + 1] = '\0';
+
+	switch (idx) {
+	case SYSSTAT_CTXSWITCH_COUNT:
+		stats->mCtxSwitchCount = atoi(buf);
 		ret = false;
 		break;
 
@@ -426,17 +532,40 @@ static int getNextLine(char *s, char **end, bool *endOfString)
 	return 0;
 }
 
+static SysStatLine getSystemStatsLine(const char *s)
+{
+	const char *end;
+
+	struct {
+		const char *s;
+		SysStatLine v;
+	} values[] = {
+		{ "cpu",     SYSSTAT_LINE_CPU },
+		{ "intr",    SYSSTAT_IRQ },
+		{ "softirq", SYSSTAT_SOFT_IRQ },
+		{ "ctxt",    SYSSTAT_CTX_SWITCH }
+	};
+
+	end = strchr(s, ' ');
+	if (!end)
+		return SYSSTAT_UNKNOWN;
+
+	for (size_t i = 0; i < SIZEOF_ARRAY(values); i++) {
+		if (strncmp(s, values[i].s, end - s) == 0)
+			return values[i].v;
+	}
+
+	return SYSSTAT_UNKNOWN;
+}
+
 int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
 {
 	TokenizerCb cb;
+	SysStatLine lineType;
 	bool endOfString = false;
 	bool process = true;
 	char *end;
 	int ret;
-
-	enum {
-		LINE_CPU_GLOBAL = 0,
-	};
 
 	if (!s || !stats)
 		return -EINVAL;
@@ -446,17 +575,31 @@ int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
 		if (ret < 0)
 			return ret;
 
+		lineType = getSystemStatsLine(s);
 		cb = nullptr;
-		switch (line) {
-		case LINE_CPU_GLOBAL:
+		switch (lineType) {
+		case SYSSTAT_LINE_CPU:
 			cb = processCpuCb;
-			process = false;
 			break;
 
+		case SYSSTAT_IRQ:
+			cb = processIrqCountCb;
+			break;
+
+		case SYSSTAT_SOFT_IRQ:
+			cb = processSoftIrqCountCb;
+			break;
+
+		case SYSSTAT_CTX_SWITCH:
+			cb = processCtxSwitchCountCb;
+			break;
+
+		default:
+			break;
 		}
 
 		if (cb) {
-			ret = tokenizeStats(s, processCpuCb, stats);
+			ret = tokenizeStats(s, cb, stats);
 			if (ret < 0)
 				return ret;
 		}
