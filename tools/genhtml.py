@@ -132,7 +132,7 @@ class ProcStatsHandler:
 
 	def handleSample(self, sample):
 		ts = sample['ts']
-		sampleName = sample['name']
+		sampleName = '%d-%s' % (sample['pid'], sample['name'])
 
 		lastSample = self.samples.getLastSample(sampleName)
 		if not lastSample:

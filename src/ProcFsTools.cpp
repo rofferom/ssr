@@ -19,6 +19,8 @@ typedef bool (*TokenizerCb) (
 		const char *end,
 		void *userdata);
 
+typedef bool (*PidFoundCb) (int pid, void *userdata);
+
 enum SysStatLine {
 	SYSSTAT_UNKNOWN,
 	SYSSTAT_LINE_CPU,
@@ -425,11 +427,7 @@ bool processCtxSwitchCountCb(int idx,
 	return ret;
 }
 
-} // anonymous namespace
-
-namespace pfstools {
-
-int findProcess(const char *name, int *outPid)
+int iterateAllPid(PidFoundCb cb, void *userdata)
 {
 	DIR *d;
 	struct dirent entry;
@@ -437,7 +435,10 @@ int findProcess(const char *name, int *outPid)
 	int pid;
 	char *endptr;
 	int ret;
-	bool found = false;
+	bool process = true;
+
+	if (!cb)
+		return -EINVAL;
 
 	d = opendir("/proc");
 	if (!d) {
@@ -446,7 +447,7 @@ int findProcess(const char *name, int *outPid)
 		return ret;
 	}
 
-	while (!found) {
+	while (process) {
 		ret = readdir_r(d, &entry, &result);
 		if (ret == 0 && !result)
 			break;
@@ -459,15 +460,77 @@ int findProcess(const char *name, int *outPid)
 			continue;
 		}
 
-		found = testPidName(pid, name);
+		process = cb(pid, userdata);
 	}
 
 	closedir(d);
 
-	if (found)
-		*outPid = pid;
+	return 0;
+}
 
-	return found ? 0 : -ENOENT;
+} // anonymous namespace
+
+namespace pfstools {
+
+struct FindProcessCtx {
+	const char *mName;
+	int mPid;
+};
+
+static bool findProcessCb(int pid, void *userdata)
+{
+	auto ctx = (FindProcessCtx *) userdata;
+	bool match;
+
+	match = testPidName(pid, ctx->mName);
+	if (match) {
+		ctx->mPid = pid;
+		return false;
+	}
+
+	return true;
+}
+
+int findProcess(const char *name, int *outPid)
+{
+	FindProcessCtx ctx;
+	int ret;
+
+	ctx.mName = name;
+	ctx.mPid = -1;
+
+	ret = iterateAllPid(findProcessCb, &ctx);
+	if (ret < 0)
+		return ret;
+
+	if (ctx.mPid != -1) {
+		ret = 0;
+		*outPid = ctx.mPid;
+	} else {
+		ret = -ENOENT;
+	}
+
+	return ret;
+}
+
+static bool findAllProcessesCb(int pid, void *userdata)
+{
+	auto pidList = (std::list<int> *) userdata;
+
+	pidList->push_back(pid);
+
+	return true;
+}
+
+int findAllProcesses(std::list<int> *outPid)
+{
+	int ret;
+
+	ret = iterateAllPid(findAllProcessesCb, outPid);
+	if (ret < 0)
+		return ret;
+
+	return 0;
 }
 
 static int getTimeNs(uint64_t *ns)

@@ -14,12 +14,25 @@ ProcessMonitor::ProcessMonitor(const char *name,
 			       const SystemMonitor::Config *config,
 			       const SystemMonitor::SystemConfig *sysSettings)
 {
+	mResearchType = ResearchType::byName;
 	mStatFd = -1;
 	mName = name;
 	mPid = INVALID_PID;
 	mConfig = config;
 	mSysSettings = sysSettings;
 }
+
+ProcessMonitor::ProcessMonitor(int pid,
+			       const SystemMonitor::Config *config,
+			       const SystemMonitor::SystemConfig *sysSettings)
+{
+	mResearchType = ResearchType::byPid;
+	mStatFd = -1;
+	mPid = pid;
+	mConfig = config;
+	mSysSettings = sysSettings;
+}
+
 
 ProcessMonitor::~ProcessMonitor()
 {
@@ -65,8 +78,8 @@ int ProcessMonitor::addNewThread(int tid)
 		 tid,
 		 stats.mName);
 
-	printf("Found new thread %s for process %s\n",
-	       info.mName, mName.c_str());
+	printf("Found new thread %s for process %d\n",
+	       info.mName, mPid);
 
 	// Register thread
 	auto insertRet = mThreads.insert( {tid, info} );
@@ -191,9 +204,22 @@ int ProcessMonitor::openProcessAndThreadsFd()
 	int ret;
 
 	// Open thread
-	ret = pfstools::findProcess(mName.c_str(), &mPid);
-	if (ret < 0)
-		return ret;
+	switch (mResearchType) {
+	case ResearchType::byName:
+		ret = pfstools::findProcess(mName.c_str(), &mPid);
+		if (ret < 0)
+			return ret;
+
+		break;
+
+	case ResearchType::byPid:
+		// pid already known
+		break;
+
+	default:
+		printf("Research type unknown : %d\n", (int) mResearchType);
+		return -EINVAL;
+	}
 
 	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
 
@@ -204,7 +230,10 @@ int ProcessMonitor::openProcessAndThreadsFd()
 		return ret;
 	}
 
-	printf("Found process '%s' : pid %d\n", mName.c_str(), mPid);
+	if (mResearchType == ResearchType::byName)
+		printf("Found process '%s' : pid %d\n", mName.c_str(), mPid);
+	else
+		printf("Found process %d\n", mPid);
 
 	// Find threads
 	if (mConfig->mRecordThreads) {
@@ -218,7 +247,8 @@ int ProcessMonitor::openProcessAndThreadsFd()
 
 int ProcessMonitor::cleanProcessAndThreadsFd()
 {
-	mPid = INVALID_PID;
+	if (mResearchType == ResearchType::byName)
+		mPid = INVALID_PID;
 
 	// Close process fd
 	close(mStatFd);
@@ -229,6 +259,11 @@ int ProcessMonitor::cleanProcessAndThreadsFd()
 		close(p.second.mFd);
 
 	mThreads.clear();
+
+	// Drop process if it doesn't exist anymore. Only when the research
+	// is done by pid.
+	if (mResearchType == ResearchType::byPid)
+		mThreads.erase(mPid);
 
 	return 0;
 }
@@ -242,7 +277,7 @@ int ProcessMonitor::readRawStats()
 {
 	int ret;
 
-	if (mPid == INVALID_PID) {
+	if (mStatFd == -1) {
 		mRawStats.mPending = false;
 		return 0;
 	}
@@ -250,7 +285,11 @@ int ProcessMonitor::readRawStats()
 	// Read process stats
 	ret = pfstools::readRawStats(mStatFd, &mRawStats);
 	if (ret < 0) {
-		printf("Process %s has stopped\n", mName.c_str());
+		if (!mName.empty())
+			printf("Process %s has stopped\n", mName.c_str());
+		else
+			printf("Process %d has stopped\n", mPid);
+
 		cleanProcessAndThreadsFd();
 		return ret;
 	}
@@ -276,6 +315,12 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 						 &processStats);
 		if (ret < 0)
 			return ret;
+
+		if (mName.empty()) {
+			mName = processStats.mName;
+			printf("Process %d name found : %s\n",
+			       mPid, processStats.mName);
+		}
 
 		if (cb.mProcessStats) {
 			processStats.mTs = mRawStats.mTs;

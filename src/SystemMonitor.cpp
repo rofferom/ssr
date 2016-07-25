@@ -43,6 +43,9 @@ private:
 	SysStatsMonitor mSysMonitor;
 	std::list<ProcessMonitor *> mProcMonitors;
 
+private:
+	int findAllProcesses();
+
 public:
 	SystemMonitorImpl(const Config &config, const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
@@ -95,8 +98,41 @@ int SystemMonitorImpl::addProcess(const char *name)
 	return 0;
 }
 
+int SystemMonitorImpl::findAllProcesses()
+{
+	std::list<int> processList;
+	ProcessMonitor *monitor;
+	int ret;
+
+	ret = pfstools::findAllProcesses(&processList);
+	if (ret < 0) {
+		printf("pfstools::findAllProcesses() failed : %d(%s\n)",
+		       ret, strerror(-ret));
+
+		return ret;
+	}
+
+	for (auto pid :processList) {
+		monitor = new ProcessMonitor(pid, &mConfig, &mSysSettings);
+		if (!monitor)
+			return -ENOMEM;
+
+		mProcMonitors.push_back(monitor);
+	}
+
+	return 0;
+}
+
 int SystemMonitorImpl::loadProcesses()
 {
+	if (mProcMonitors.empty()) {
+		int ret;
+
+		ret = findAllProcesses();
+		if (ret < 0)
+			return ret;
+	}
+
 	for (auto m :mProcMonitors)
 		m->init();
 

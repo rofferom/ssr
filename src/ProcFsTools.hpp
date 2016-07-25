@@ -1,6 +1,9 @@
 #ifndef __PROCSTATPARSER_HPP__
 #define __PROCSTATPARSER_HPP__
 
+#include <string>
+#include <list>
+
 #include "SystemMonitor.hpp"
 
 #define STAT_SIZE 4096*2
@@ -14,6 +17,8 @@ struct RawStats {
 };
 
 int findProcess(const char *name, int *outPid);
+
+int findAllProcesses(std::list<int> *outPid);
 
 int readRawStats(int fd, RawStats *stats);
 

@@ -126,7 +126,7 @@ int parseArgs(int argc, char *argv[], Params *params)
 
 void printUsage(int argc, char *argv[])
 {
-	printf("Usage  %s [-h] [-p PERIOD] -o OUTPUT process [process ...]\n",
+	printf("Usage  %s [-h] [-p PERIOD] -o OUTPUT [process...]\n",
 	       argv[0]);
 
 	printf("\n");
@@ -251,6 +251,7 @@ int main(int argc, char *argv[])
 	SystemMonitor *mon = nullptr;
 	SystemMonitor::Config monConfig;
 	SystemRecorder *recorder = nullptr;
+	bool recordAllProcesses;
 	int ret;
 
 	signal(SIGINT, sighandler);
@@ -269,10 +270,13 @@ int main(int argc, char *argv[])
 		printf("No output file specified\n\n");
 		printUsage(argc, argv);
 		return 1;
-	} else if (optind == argc) {
-		printf("No process name specified\n\n");
-		printUsage(argc, argv);
-		return 1;
+	}
+
+	if (optind == argc) {
+		printf("Record all processes\n");
+		recordAllProcesses = true;
+	} else {
+		recordAllProcesses = false;
 	}
 
 	// Create recorder
@@ -303,13 +307,16 @@ int main(int argc, char *argv[])
 	if (!mon)
 		goto error;
 
-	for (int i = optind; i < argc; i++) {
-		ret = mon->addProcess(argv[i]);
-		if (ret < 0) {
-			printf("addProcessFailed() : %d(%s)\n", -ret, strerror(-ret));
-			goto error;
-		}
+	if (!recordAllProcesses) {
+		for (int i = optind; i < argc; i++) {
+			ret = mon->addProcess(argv[i]);
+			if (ret < 0) {
+				printf("addProcessFailed() : %d(%s)\n",
+				       -ret, strerror(-ret));
+				goto error;
+			}
 
+		}
 	}
 
 	mon->loadProcesses();

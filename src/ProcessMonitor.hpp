@@ -6,6 +6,11 @@
 
 class ProcessMonitor {
 private:
+	enum class ResearchType : int {
+		byName,
+		byPid
+	};
+
 	struct ThreadInfo {
 		int mTid;
 		int mFd;;
@@ -15,6 +20,8 @@ private:
 	};
 
 private:
+	ResearchType mResearchType;
+
 	int mStatFd;
 	int mPid;
 	std::string mName;
@@ -42,6 +49,11 @@ public:
 	ProcessMonitor(const char *name,
 		       const SystemMonitor::Config *config,
 		       const SystemMonitor::SystemConfig *sysSettings);
+
+	ProcessMonitor(int pid,
+		       const SystemMonitor::Config *config,
+		       const SystemMonitor::SystemConfig *sysSettings);
+
 
 	~ProcessMonitor();
 
