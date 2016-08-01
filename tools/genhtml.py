@@ -352,8 +352,9 @@ if __name__ == '__main__':
 		parser.printHeader()
 		sys.exit(1)
 	elif not args.output:
-		argParser.print_help()
-		sys.exit(1)
+                args.output = args.input + ".html"
+                print("Output: %s" % args.output)
+
 
 	# Create generic data
 	samples = SampleCollection()
