@@ -273,6 +273,58 @@ class SampleCollection:
 		print('Average acquisition time : %f ns' % self.averageAcq)
 		print('Standard deviation : %f ns' % self.standardDeviation)
 
+class HtmlGenerator:
+	def getExtension(self):
+		return ".html"
+
+	def generate(self, sampleName, columns, samples, outputPath):
+		# Create output file
+		sourcePath = os.path.dirname(os.path.abspath(__file__))
+		templateFile = open('%s/template.html' % sourcePath, 'r')
+		template = jinja2.Template(templateFile.read())
+
+		html = template.render(sampleName=sampleName, columns=columns, samples=samples)
+
+		# Write output file
+		out = open(outputPath, 'w')
+		out.write(html)
+
+class CsvGenerator:
+	def getExtension(self):
+		return ".csv"
+
+	def writeLine(self, out, columns):
+		firstColumn = True
+		for c in columns:
+			if firstColumn:
+				out.write(str(c))
+				firstColumn = False
+			else:
+				out.write(',%s' % c)
+
+		out.write('\n')
+
+	def generate(self, sampleName, columns, samples, outputPath):
+		out = open(outputPath, 'w')
+
+		self.writeLine(out, columns)
+
+		for s in samples:
+			self.writeLine(out, s)
+
+def getGenerator(outputPath):
+	generators = [
+		HtmlGenerator(),
+		CsvGenerator(),
+	]
+
+	(_, extension) = os.path.splitext(outputPath)
+	for g in generators:
+		if g.getExtension() == extension:
+			return g
+
+	raise Exception('Unable to generate a file with extension %s' % extension)
+
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
@@ -332,15 +384,8 @@ if __name__ == '__main__':
 	samples.computeStats()
 
 	# Create output file
-	sourcePath = os.path.dirname(os.path.abspath(__file__))
-	templateFile = open('%s/template.html' % sourcePath, 'r')
-	template = jinja2.Template(templateFile.read())
-
-	html = template.render(sampleName=args.sample, columns=samples.getColumns(), samples=samples.getSamples(filterOutliers=args.filter_outliers))
-
-	# Write output file
-	out = open(args.output, 'w')
-	out.write(html)
+	generator = getGenerator(args.output)
+	generator.generate(sampleName=args.sample, columns=samples.getColumns(), samples=samples.getSamples(filterOutliers=args.filter_outliers), outputPath=args.output)
 
 	# Display general stats
 	acqDurationHandler.printStats()
