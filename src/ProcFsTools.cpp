@@ -541,7 +541,7 @@ static int getTimeNs(uint64_t *ns)
 	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
 	if (ret < 0) {
 		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
+		printf("clock_gettime() failed : %d(%m)\n", errno);
 		return ret;
 	}
 
@@ -564,7 +564,7 @@ int readRawStats(int fd, RawStats *stats)
 	if (readRet == -1) {
 		ret = -errno;
 		stats->mPending = false;
-		printf("read() failed : %d(%m)", errno);
+		printf("read() failed : %d(%m)\n", errno);
 		return ret;
 	}
 
