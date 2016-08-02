@@ -181,6 +181,7 @@ int ProcessMonitor::processRawThreadsStats(const SystemMonitor::Callbacks &cb)
 
 		if (cb.mThreadStats) {
 			threadStats.mTs = threadInfo->mRawStats.mTs;
+			threadStats.mAcqEnd = threadInfo->mRawStats.mAcqEnd;
 
 			strncpy(threadStats.mName, threadInfo->mName,
 				sizeof(threadStats.mName));
@@ -324,6 +325,7 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 
 		if (cb.mProcessStats) {
 			processStats.mTs = mRawStats.mTs;
+			processStats.mAcqEnd = mRawStats.mAcqEnd;
 			cb.mProcessStats(processStats, cb.mUserdata);
 		}
 

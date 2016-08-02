@@ -559,8 +559,8 @@ int readRawStats(int fd, RawStats *stats)
 		return -EINVAL;
 
 	getTimeNs(&stats->mTs);
-
 	readRet = pread(fd, stats->mContent, sizeof(stats->mContent), 0);
+	getTimeNs(&stats->mAcqEnd);
 	if (readRet == -1) {
 		ret = -errno;
 		stats->mPending = false;

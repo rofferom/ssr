@@ -15,6 +15,7 @@ public:
 
 	struct SystemStats {
 		uint64_t    mTs;
+		uint64_t    mAcqEnd;
 
 		// Durations
 		uint64_t    mUtime;
@@ -33,6 +34,8 @@ public:
 
 	struct ProcessStats {
 		uint64_t    mTs;
+		uint64_t    mAcqEnd;
+
 		uint32_t    mPid;
 		char        mName[64];
 		uint32_t    mVsize;
@@ -45,6 +48,8 @@ public:
 
 	struct ThreadStats {
 		uint64_t    mTs;
+		uint64_t    mAcqEnd;
+
 		uint32_t    mPid;
 		uint32_t    mTid;
 		char        mName[64];

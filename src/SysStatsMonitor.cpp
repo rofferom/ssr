@@ -57,6 +57,7 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 
 	if (cb.mSystemStats) {
 		stats.mTs = mRawStats.mTs;
+		stats.mAcqEnd = mRawStats.mAcqEnd;
 		cb.mSystemStats(stats, cb.mUserdata);
 	}
 

@@ -140,6 +140,9 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mTs, "ts");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mAcqEnd, "acqend");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::SystemStats, mUtime, "utime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
@@ -183,6 +186,9 @@ int SystemRecorderImpl::initDescs()
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mTs, "ts");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mAcqEnd, "acqend");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ProcessStats, mPid, "pid");
 	RETURN_IF_REGISTER_FAILED(ret);
 
@@ -215,6 +221,9 @@ int SystemRecorderImpl::initDescs()
 	desc->mName = "threadstats";
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mAcqEnd, "acqend");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(&desc->mDesc, SystemMonitor::ThreadStats, mPid, "pid");
