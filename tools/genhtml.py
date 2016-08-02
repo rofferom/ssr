@@ -4,6 +4,8 @@
 import os
 import sys
 import argparse
+import statistics
+import math
 import jinja2
 from ssr.parser import Parser
 
@@ -103,6 +105,7 @@ class SystemStatsHandler:
 		self.samples.addSample('load', ts, load)
 
 		# Save sample to get it at next sample
+		self.samples.addRecordDuration(sample['ts'], sample['acqend'])
 		self.samples.saveSample(self.SAMPLENAME, sample)
 
 class ProcStatsHandler:
@@ -150,6 +153,7 @@ class ProcStatsHandler:
 		handler(ts, sampleName, lastSample, sample)
 
 		# Save sample to get it at next sample
+		self.samples.addRecordDuration(sample['ts'], sample['acqend'])
 		self.samples.saveSample(sampleName, sample)
 
 class ParserEvtHandler:
@@ -178,6 +182,13 @@ class SampleCollection:
 		self.samples = {}
 		self.lastSamples = {}
 		self.columns = ['ts']
+		self.recordDuration = {}
+
+		self.averageAcq = None
+		self.standardDeviation = None
+
+	def addRecordDuration(self, acqStart, acqEnd):
+		self.recordDuration[acqStart] = acqEnd - acqStart
 
 	def addSample(self, name, ts, value):
 		if not name in self.columns:
@@ -212,10 +223,31 @@ class SampleCollection:
 
 		return columnsToDisplay
 
-	def getSamples(self):
+	def computeStats(self):
+		durationList = list(self.recordDuration.values())
+		durationList.sort()
+		durationCount = len(durationList)
+
+		secondQuartileStart = int(durationCount / 3)
+		thirdQuartileEnd = int(durationCount * 3 / 4)
+		durationList = durationList[secondQuartileStart:thirdQuartileEnd]
+
+		self.averageAcq = statistics.mean(durationList)
+		self.standardDeviation = math.sqrt(statistics.variance(durationList))
+
+	def getSamples(self, filterOutliers):
+		durationThreshold = self.averageAcq + 3 * self.standardDeviation
+
 		ret = []
 
+		skipCount = 0
 		for ts in sorted(self.samples):
+			duration = self.recordDuration[ts]
+			if filterOutliers and duration > durationThreshold:
+				print('Skip sample at timestamp %d (duration %d ns)' % (ts, duration))
+				skipCount += 1
+				continue
+
 			row = [ts]
 
 			tsEntry = self.samples[ts]
@@ -227,6 +259,8 @@ class SampleCollection:
 
 			ret.append(row)
 
+		print('%s samples skipped' % skipCount)
+
 		return ret
 
 	def printStats(self):
@@ -236,6 +270,9 @@ class SampleCollection:
 		for name in columns:
 			print('\t%s' % name)
 
+		print('Average acquisition time : %f ns' % self.averageAcq)
+		print('Standard deviation : %f ns' % self.standardDeviation)
+
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
@@ -243,6 +280,7 @@ def parseArgs():
 	parser.add_argument('-S', '--struct', default=DEFAULT_STRUCTNAME, help='Struct name to use')
 	parser.add_argument('-s', '--sample', default=DEFAULT_SAMPLENAME, help='Sample name to use')
 	parser.add_argument('-H', '--header', action='store_true', help='Display input header')
+	parser.add_argument('--filter-outliers', action='store_true', help='Filter outliers')
 	parser.add_argument('process', nargs='*', help='Process list to use')
 	return (parser, parser.parse_args())
 
@@ -291,13 +329,14 @@ if __name__ == '__main__':
 
 	# Parse input file
 	parser.parse(evtHandler)
+	samples.computeStats()
 
 	# Create output file
 	sourcePath = os.path.dirname(os.path.abspath(__file__))
 	templateFile = open('%s/template.html' % sourcePath, 'r')
 	template = jinja2.Template(templateFile.read())
 
-	html = template.render(sampleName=args.sample, columns=samples.getColumns(), samples=samples.getSamples())
+	html = template.render(sampleName=args.sample, columns=samples.getColumns(), samples=samples.getSamples(filterOutliers=args.filter_outliers))
 
 	# Write output file
 	out = open(args.output, 'w')
