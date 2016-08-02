@@ -15,6 +15,7 @@ ProcessMonitor::ProcessMonitor(const char *name,
 			       const SystemMonitor::SystemConfig *sysSettings)
 {
 	mResearchType = ResearchType::byName;
+	mState = AcqState::pending;
 	mStatFd = -1;
 	mName = name;
 	mPid = INVALID_PID;
@@ -27,6 +28,7 @@ ProcessMonitor::ProcessMonitor(int pid,
 			       const SystemMonitor::SystemConfig *sysSettings)
 {
 	mResearchType = ResearchType::byPid;
+	mState = AcqState::pending;
 	mStatFd = -1;
 	mPid = pid;
 	mConfig = config;
@@ -226,10 +228,13 @@ int ProcessMonitor::openProcessAndThreadsFd()
 
 	mStatFd = open(path, O_RDONLY|O_CLOEXEC);
 	if (mStatFd == -1) {
+		mState = AcqState::failed;
 		ret = -errno;
 		printf("Fail to open %s : %d(%m)\n", path, errno);
 		return ret;
 	}
+
+	mState = AcqState::started;
 
 	if (mResearchType == ResearchType::byName)
 		printf("Found process '%s' : pid %d\n", mName.c_str(), mPid);
@@ -294,6 +299,7 @@ int ProcessMonitor::readRawStats()
 		}
 
 		cleanProcessAndThreadsFd();
+		mState = AcqState::failed;
 		return ret;
 	}
 
@@ -309,9 +315,14 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	SystemMonitor::ProcessStats processStats;
 	int ret;
 
-	// Acquisition has failed. This means the process is currently not
-	// known.
-	if (!mRawStats.mPending) {
+	if (mState == AcqState::failed && mResearchType == ResearchType::byPid) {
+		// Acquisition has failed at least once after a snapshot of
+		// all the existing pid. It should mean that the process has
+		// stopped. Avoid any further acquisition
+		return 0;
+	} else if (!mRawStats.mPending) {
+		// Acquisition has failed. This means the process is currently not
+		// known.
 		ret = openProcessAndThreadsFd();
 	} else {
 		ret = pfstools::readProcessStats(mRawStats.mContent,

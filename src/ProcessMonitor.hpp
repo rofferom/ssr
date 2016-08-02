@@ -11,6 +11,12 @@ private:
 		byPid
 	};
 
+	enum class AcqState {
+		pending,
+		started,
+		failed
+	};
+
 	struct ThreadInfo {
 		int mTid;
 		int mFd;;
@@ -22,6 +28,7 @@ private:
 private:
 	ResearchType mResearchType;
 
+	AcqState mState;
 	int mStatFd;
 	int mPid;
 	std::string mName;
