@@ -286,10 +286,12 @@ int ProcessMonitor::readRawStats()
 	// Read process stats
 	ret = pfstools::readRawStats(mStatFd, &mRawStats);
 	if (ret < 0) {
-		if (!mName.empty())
-			printf("Process %s has stopped\n", mName.c_str());
-		else
+		if (!mName.empty()) {
+			printf("Process %d-%s has stopped\n",
+			       mPid, mName.c_str());
+		} else {
 			printf("Process %d has stopped\n", mPid);
+		}
 
 		cleanProcessAndThreadsFd();
 		return ret;
