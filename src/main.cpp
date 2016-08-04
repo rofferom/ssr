@@ -87,7 +87,7 @@ int parseArgs(int argc, char *argv[], Params *params)
 		{ "duration",        optional_argument, 0, 'd' },
 		{ "output",          required_argument, 0, 'o' },
 		{ "disable-threads", optional_argument, &params->recordThreads, 0 },
-		{ 0, 0, 0}
+		{ 0, 0, 0, 0 }
 	};
 
 	while (true) {
