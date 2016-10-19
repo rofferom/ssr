@@ -133,9 +133,23 @@ class ProcStatsHandler:
 		rss = sample['rss'] * self.sysconfig.pagesize / 1024
 		self.samples.addSample(sampleName, ts, rss)
 
+	def isSampleNameValid(self, sampleName):
+		if len(self.args.process) == 0:
+			return True
+
+		for process in self.args.process:
+			if process in sampleName:
+				return True
+
+		return False
+
 	def handleSample(self, sample):
 		ts = sample['ts']
 		sampleName = '%d-%s' % (sample['pid'], sample['name'])
+
+		# Check if sample name is valid
+		if not self.isSampleNameValid(sampleName):
+			return
 
 		lastSample = self.samples.getLastSample(sampleName)
 		if not lastSample:
