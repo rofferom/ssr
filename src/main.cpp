@@ -6,12 +6,11 @@
 #include <signal.h>
 #include <poll.h>
 #include <unistd.h>
-#include <sys/eventfd.h>
-#include <sys/timerfd.h>
 #include <sys/stat.h>
 
 #include <string>
 
+#include "System.hpp"
 #include "SystemRecorder.hpp"
 #include "SystemMonitor.hpp"
 

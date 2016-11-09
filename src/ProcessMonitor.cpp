@@ -2,6 +2,8 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <errno.h>
+#include <stdlib.h>
 
 #include <map>
 
