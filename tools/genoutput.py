@@ -7,6 +7,7 @@ import argparse
 import statistics
 import math
 import jinja2
+import re
 from ssr.parser import Parser
 
 DEFAULT_STRUCTNAME = 'processstats'
@@ -326,10 +327,82 @@ class CsvGenerator:
 		for s in samples:
 			self.writeLine(out, s)
 
+class TxtGenerator:
+	class Thread:
+		def __init__(self, name, column):
+			self.name = name
+			self.column = column # original column index
+			self.sum = 0
+			self.max = 0
+			self.count = 0
+
+	def getExtension(self):
+		return ".txt"
+
+	def cleanName(self, name):
+		return re.search("\((.*)\)", name).group(1)
+
+	def generate(self, sampleName, columns, samples, outputPath):
+		columnWidth = 5 # used for display
+		threads = []
+		threadsMaxLen = 0
+		sumTotal = 0
+
+		# Filter columns to get threads names (exclude "ts")
+		for i in range(len(columns)):
+			if columns[i] == "ts":
+				continue
+
+			name = self.cleanName(columns[i])
+			threads.append(TxtGenerator.Thread(name, i))
+
+		threadsMaxLen = max([len(t.name) for t in threads])
+
+		# Compute sum and max for each thread
+		for s in samples:
+			for t in threads:
+				if s[t.column] is None:
+					continue
+
+				f = float(s[t.column])
+
+				# Update thread
+				t.sum += f
+				t.max = max(t.max, f)
+				t.count += 1
+
+				# Update total charge
+				sumTotal += f
+
+		# Sort threads by sum
+		threads.sort(key=lambda t: t.sum, reverse=True)
+
+		# Write output file
+		out = open(outputPath, 'w')
+
+		# Print titles to file
+		print("thread".ljust(threadsMaxLen),
+		      "avg".ljust(columnWidth),
+		      "max".ljust(columnWidth),
+		      "%total",
+		      sep='   ',
+		      file=out)
+
+		# Print sorted data to file
+		formatCount = lambda n : '{:.2f}'.format(n).rjust(columnWidth)
+		for t in threads:
+			print(t.name.ljust(threadsMaxLen),
+			      formatCount(t.sum / t.count),
+			      formatCount(t.max),
+			      formatCount(t.sum * 100. / sumTotal),
+			      sep='   ',
+			      file=out)
+
 def getGenerator(outputPath):
 	generators = [
 		HtmlGenerator(),
 		CsvGenerator(),
+		TxtGenerator(),
 	]
 
 	(_, extension) = os.path.splitext(outputPath)
@@ -342,7 +415,7 @@ def getGenerator(outputPath):
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
-	parser.add_argument('-o', '--output', help='File to generate. Depending on the extension the format will be html or csv.')
+	parser.add_argument('-o', '--output', help='File to generate. Depending on the extension the format will be html, csv or txt.')
 	parser.add_argument('-S', '--struct', default=DEFAULT_STRUCTNAME, help='Struct name to use : \
 systemstats | processstats | threadstats')
 	parser.add_argument('-s', '--sample', default=DEFAULT_SAMPLENAME, help='Sample name to use')
