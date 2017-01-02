@@ -6,6 +6,8 @@
 
 #include <functional>
 
+class EventLoop;
+
 class SystemMonitor {
 public:
 	struct SystemConfig {
@@ -83,10 +85,12 @@ public:
 
 	struct Config {
 		bool mRecordThreads;
+		int mAcqPeriod; // seconds
 
 		Config()
 		{
 			mRecordThreads = true;
+			mAcqPeriod = 1;
 		}
 	};
 
@@ -100,7 +104,12 @@ public:
 	virtual int loadProcesses() = 0;
 	virtual int process() = 0;
 
-	static SystemMonitor *create(const Config &config, const Callbacks &cb);
+	static int create(
+			EventLoop *loop,
+			const Config &config,
+			const Callbacks &cb,
+			SystemMonitor **monitor);
+
 	static int initStructDescs();
 };
 

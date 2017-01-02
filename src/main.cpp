@@ -21,13 +21,11 @@
 static struct Context {
 	bool stop;
 	EventLoop loop;
-	int timer;
 	int durationTimer;
 
 	Context()
 	{
 		stop = false;
-		timer = -1;
 		durationTimer = -1;
 	}
 } ctx;
@@ -330,9 +328,10 @@ int main(int argc, char *argv[])
 	cb.mUserdata = recorder;
 
 	monConfig.mRecordThreads = params.recordThreads;
+	monConfig.mAcqPeriod = params.period;
 
-	mon = SystemMonitor::create(monConfig, cb);
-	if (!mon)
+	ret = SystemMonitor::create(&ctx.loop, monConfig, cb, &mon);
+	if (ret < 0)
 		goto error;
 
 	if (!recordAllProcesses) {
@@ -361,45 +360,6 @@ int main(int argc, char *argv[])
 	}
 
 	recorder->record(systemConfig);
-
-	// Create timer
-	ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
-	if (ret < 0) {
-		printf("timerfd_create() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	ctx.timer = ret;
-
-	// Start timer
-	timer.it_interval.tv_sec = params.period;
-	timer.it_interval.tv_nsec = 0;
-
-	timer.it_value.tv_sec = params.period;
-	timer.it_value.tv_nsec = 0;
-
-	ret = timerfd_settime(ctx.timer, 0, &timer, NULL);
-	if (ret < 0) {
-		printf("timerfd_settime() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	ret = ctx.loop.addFd(EPOLLIN, ctx.timer,
-		[mon] (int fd, int evt) {
-			uint64_t expirations;
-			int ret;
-
-			mon->process();
-
-			ret = read(fd, &expirations, sizeof(expirations));
-			if (ret < 0)
-				printf("read() failed : %d(%m)\n", errno);
-		}
-	);
-	if (ret < 0) {
-		printf("addFd() failed\n");
-		goto error;
-	}
 
 	// Create duration timer
 	if (params.duration > 0) {
@@ -447,8 +407,6 @@ int main(int argc, char *argv[])
 	delete mon;
 	delete recorder;
 
-	if (ctx.timer != -1)
-		close(ctx.timer);
 
 	if (ctx.durationTimer != -1)
 		close(ctx.durationTimer);
@@ -459,8 +417,6 @@ error:
 	delete mon;
 	delete recorder;
 
-	if (ctx.timer != -1)
-		close(ctx.timer);
 
 	if (ctx.durationTimer != -1)
 		close(ctx.durationTimer);
