@@ -14,19 +14,19 @@
 #include "SystemRecorder.hpp"
 #include "SystemMonitor.hpp"
 #include "StructDescRegistry.hpp"
+#include "EventLoop.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
 static struct Context {
 	bool stop;
-	int stopfd;
+	EventLoop loop;
 	int timer;
 	int durationTimer;
 
 	Context()
 	{
 		stop = false;
-		stopfd = -1;
 		timer = -1;
 		durationTimer = -1;
 	}
@@ -146,14 +146,9 @@ void printUsage(int argc, char *argv[])
 
 static void sighandler(int s)
 {
-	int64_t stop = 1;
-	int ret;
-
 	printf("stop\n");
 	ctx.stop = true;
-	ret = write(ctx.stopfd, &stop, sizeof(stop));
-	if (ret < 0)
-		printf("write() failed : %d(%m)\n", errno);
+	ctx.loop.abort();
 }
 
 static int initStructDescs()
@@ -264,8 +259,6 @@ static bool getOutputPath(const std::string &basePath, std::string *outPath)
 int main(int argc, char *argv[])
 {
 	struct itimerspec timer;
-	struct pollfd fds[3];
-	int fdsCount;
 	Params params;
 	std::string outputPath;
 	ProgramParameters progParameters;
@@ -301,6 +294,11 @@ int main(int argc, char *argv[])
 	} else {
 		recordAllProcesses = false;
 	}
+
+	// Init loop
+	ret = ctx.loop.init();
+	if (ret < 0)
+		return 1;
 
 	// Init StructDesc
 	ret = initStructDescs();
@@ -364,19 +362,6 @@ int main(int argc, char *argv[])
 
 	recorder->record(systemConfig);
 
-	// Create stopfd
-	ret = eventfd(0, EFD_CLOEXEC);
-	if (ret < 0) {
-		printf("eventfd() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	ctx.stopfd = ret;
-
-	fds[0].fd = ctx.stopfd;
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
 	// Create timer
 	ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
 	if (ret < 0) {
@@ -399,11 +384,22 @@ int main(int argc, char *argv[])
 		goto error;
 	}
 
-	fds[1].fd = ctx.timer;
-	fds[1].events = POLLIN;
-	fds[1].revents = 0;
+	ret = ctx.loop.addFd(EPOLLIN, ctx.timer,
+		[mon] (int fd, int evt) {
+			uint64_t expirations;
+			int ret;
 
-	fdsCount = 2;
+			mon->process();
+
+			ret = read(fd, &expirations, sizeof(expirations));
+			if (ret < 0)
+				printf("read() failed : %d(%m)\n", errno);
+		}
+	);
+	if (ret < 0) {
+		printf("addFd() failed\n");
+		goto error;
+	}
 
 	// Create duration timer
 	if (params.duration > 0) {
@@ -428,45 +424,21 @@ int main(int argc, char *argv[])
 			goto error;
 		}
 
-		fds[2].fd = ctx.durationTimer;
-		fds[2].events = POLLIN;
-		fds[2].revents = 0;
-
-		fdsCount++;
-	} else {
-		fds[2].fd = -1;
-		fds[2].events = 0;
-		fds[2].revents = 0;
+		ret = ctx.loop.addFd(EPOLLIN, ctx.durationTimer,
+			[] (int fd, int evt) {
+				ctx.stop = true;
+			}
+		);
+		if (ret < 0) {
+			printf("addFd() failed\n");
+			goto error;
+		}
 	}
 
 	// Start poll
-	while (true) {
-		do {
-			ret = poll(fds, fdsCount, -1);
-		} while (ret == -1 && errno == EINTR);
-
-		if (ret == -1) {
-			printf("poll() failed : %d(%m)\n", errno);
-			goto error;
-		} else if (ret == 0) {
-			printf("poll() : timeout\n");
-			continue;
-		}
-
-		if (ctx.stop)
-			break;
-
-		if (fds[1].revents & POLLIN) {
-			uint64_t expirations;
-
-			mon->process();
-
-			ret = read(fds[1].fd, &expirations, sizeof(expirations));
-			if (ret < 0)
-				printf("read() failed : %d(%m)\n", errno);
-		}
-
-		if (fds[2].revents & POLLIN)
+	while (!ctx.stop) {
+		ret = ctx.loop.wait(-1);
+		if (ret < 0)
 			break;
 	}
 
@@ -474,9 +446,6 @@ int main(int argc, char *argv[])
 
 	delete mon;
 	delete recorder;
-
-	if (ctx.stopfd != -1)
-		close(ctx.stopfd);
 
 	if (ctx.timer != -1)
 		close(ctx.timer);
@@ -489,9 +458,6 @@ int main(int argc, char *argv[])
 error:
 	delete mon;
 	delete recorder;
-
-	if (ctx.stopfd != -1)
-		close(ctx.stopfd);
 
 	if (ctx.timer != -1)
 		close(ctx.timer);
