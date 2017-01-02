@@ -450,6 +450,9 @@ int main(int argc, char *argv[])
 	if (ctx.timer != -1)
 		close(ctx.timer);
 
+	if (ctx.durationTimer != -1)
+		close(ctx.durationTimer);
+
 	return 0;
 
 error:
@@ -461,6 +464,9 @@ error:
 
 	if (ctx.timer != -1)
 		close(ctx.timer);
+
+	if (ctx.durationTimer != -1)
+		close(ctx.durationTimer);
 
 	return 1;
 }
