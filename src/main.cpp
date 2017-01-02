@@ -13,6 +13,7 @@
 #include "System.hpp"
 #include "SystemRecorder.hpp"
 #include "SystemMonitor.hpp"
+#include "StructDescRegistry.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
@@ -155,6 +156,29 @@ static void sighandler(int s)
 		printf("write() failed : %d(%m)\n", errno);
 }
 
+static int initStructDescs()
+{
+	StructDesc *desc;
+	const char *type;
+	int ret;
+
+	// ProgramParameters
+	type = "programparameters";
+
+	ret = StructDescRegistry::registerType<ProgramParameters>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_STRING(desc, ProgramParameters, mParams, "params");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// Initialize other available StructDesc
+	ret = SystemMonitor::initStructDescs();
+	if (ret < 0)
+		return 0;
+
+	return 0;
+}
+
 static void systemStatsCb(
 		const SystemMonitor::SystemStats &stats,
 		void *userdata)
@@ -278,8 +302,15 @@ int main(int argc, char *argv[])
 		recordAllProcesses = false;
 	}
 
+	// Init StructDesc
+	ret = initStructDescs();
+	if (ret < 0) {
+		printf("Fail to initialize struct descriptions\n");
+		return 1;
+	}
+
 	// Create recorder
-	recorder = SystemRecorder::create();
+	recorder = new SystemRecorder();
 	if (!recorder)
 		goto error;
 

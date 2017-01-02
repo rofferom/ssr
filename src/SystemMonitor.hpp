@@ -101,6 +101,7 @@ public:
 	virtual int process() = 0;
 
 	static SystemMonitor *create(const Config &config, const Callbacks &cb);
+	static int initStructDescs();
 };
 
 #endif // !__SYSTEM_MONITOR_HPP__

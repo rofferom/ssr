@@ -1,29 +1,53 @@
 #ifndef __SYSTEM_RECORDER_HPP__
 #define __SYSTEM_RECORDER_HPP__
 
+#include <stdio.h>
+#include <errno.h>
 #include "SystemMonitor.hpp"
+#include "FileSink.hpp"
+#include "StructDescRegistry.hpp"
 
 struct ProgramParameters {
 	char mParams[1024];
 };
 
 class SystemRecorder {
+private:
+	FILE *mFile;
+	FileSink *mSink;
+
+private:
+	int writeHeader();
+
 public:
-	virtual ~SystemRecorder() {}
+	SystemRecorder();
+	virtual ~SystemRecorder();
 
-	virtual int open(const char *path) = 0;
-	virtual int close() = 0;
+	virtual int open(const char *path);
+	virtual int close();
 
-	virtual int flush() = 0;
+	virtual int flush();
 
-	virtual int record(const struct ProgramParameters &params) = 0;
-	virtual int record(const SystemMonitor::SystemConfig &config) = 0;
-	virtual int record(const SystemMonitor::SystemStats &stats) = 0;
-	virtual int record(const SystemMonitor::ProcessStats &stats) = 0;
-	virtual int record(const SystemMonitor::ThreadStats &stats) = 0;
-	virtual int record(const SystemMonitor::AcquisitionDuration &duration) = 0;
+	template <typename T>
+	int record(const T &params)
+	{
+		const StructDescRegistry::Type *type;
+		int ret;
 
-	static SystemRecorder *create();
+		ret = StructDescRegistry::getType<T>(&type);
+		if (ret < 0) {
+			printf("Fail to get type %s\n", typeid(T).name());
+			return ret;
+		}
+
+		ret = ValueTrait<uint8_t>::write(mSink, type->mId);
+		RETURN_IF_WRITE_FAILED(ret);
+
+		ret = type->mDesc.writeValue(mSink, &params);
+		RETURN_IF_WRITE_FAILED(ret);
+
+		return 0;
+	}
 };
 
 #endif // !__SYSTEM_RECORDER_HPP__

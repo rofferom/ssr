@@ -14,6 +14,7 @@
 #include "SysStatsMonitor.hpp"
 #include "SystemMonitor.hpp"
 #include "ProcFsTools.hpp"
+#include "StructDescRegistry.hpp"
 
 namespace {
 
@@ -177,4 +178,139 @@ int SystemMonitorImpl::process()
 SystemMonitor *SystemMonitor::create(const Config &config, const Callbacks &cb)
 {
 	return new SystemMonitorImpl(config, cb);
+}
+
+int SystemMonitor::initStructDescs()
+{
+	StructDesc *desc;
+	const char *type;
+	int ret;
+
+	// SystemConfig
+	type = "systemconfig";
+
+	ret = StructDescRegistry::registerType<SystemConfig>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemConfig, mClkTck, "clktck");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemConfig, mPagesize, "pagesize");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// SystemStats
+	type = "systemstats";
+
+	ret = StructDescRegistry::registerType<SystemStats>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mAcqEnd, "acqend");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mUtime, "utime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mNice, "nice");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mStime, "stime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mIdle, "idle");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mIoWait, "iowait");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mIrq, "irq");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mSoftIrq, "softirq");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mIrqCount, "irqcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mSoftIrqCount, "softirqcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mCtxSwitchCount, "ctxswitchcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// ProcessStats
+	type = "processstats";
+
+	ret = StructDescRegistry::registerType<ProcessStats>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mAcqEnd, "acqend");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mPid, "pid");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_STRING(desc, ProcessStats, mName, "name");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mVsize, "vsize");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mRss, "rss");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mThreadCount, "threadcount");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mUtime, "utime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mStime, "stime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// ThreadStats
+	type = "threadstats";
+
+	ret = StructDescRegistry::registerType<ThreadStats>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mTs, "ts");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mAcqEnd, "acqend");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mPid, "pid");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mTid, "tid");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_STRING(desc, ThreadStats, mName, "name");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mUtime, "utime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mStime, "stime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// Acquisition duration
+	type = "acqduration";
+
+	ret = StructDescRegistry::registerType<AcquisitionDuration>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_RAW_VALUE(desc, AcquisitionDuration, mStart, "start");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, AcquisitionDuration, mEnd, "end");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	return 0;
 }

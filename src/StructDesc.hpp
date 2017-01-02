@@ -16,6 +16,24 @@
 	(desc)->registerRawValue<const char *>( \
 			name, offsetof(_class_, field))
 
+#define RETURN_IF_REGISTER_FAILED(ret) \
+	if (ret < 0) { \
+		printf("%s:%d: register() failed : %d(%s)\n", \
+		       __FILE__, __LINE__, -ret, strerror(-ret)); \
+	}
+
+#define RETURN_IF_REGISTER_TYPE_FAILED(ret, type) \
+	if (ret < 0) { \
+		printf("%s:%d: registerType(%s) failed : %d(%s)\n", \
+		       __FILE__, __LINE__, type, -ret, strerror(-ret)); \
+	}
+
+#define RETURN_IF_WRITE_FAILED(ret) \
+	if (ret < 0) { \
+		printf("%s:%d: registerType() failed : %d(%s)\n", \
+		       __FILE__, __LINE__, -ret, strerror(-ret)); \
+	}
+
 class StructDesc {
 private:
 	enum EntryType : uint8_t {
@@ -107,7 +125,7 @@ public:
 		return 0;
 	}
 
-	int writeValueInternal(ISink *sink, void *p)
+	int writeValueInternal(ISink *sink, void *p) const
 	{
 		for (auto &desc: mEntryDescList)
 			desc->mValueWriter(desc, sink, p);
@@ -116,17 +134,13 @@ public:
 	}
 
 	template <typename T>
-	int writeValue(ISink *sink, T *p)
+	int writeValue(ISink *sink, T *p) const
 	{
 		return writeValueInternal(sink, (void *) p);
 	}
 };
 
 template <>
-ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base)
-{
-	std::ptrdiff_t p = (std::ptrdiff_t ) base + desc->mParams.raw.offset;
-	return ValueTrait<const char *>::write(sink, (const char *) p);
-}
+ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base);
 
 #endif // !__STRUCTDESC_HPP__
