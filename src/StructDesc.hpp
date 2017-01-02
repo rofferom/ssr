@@ -24,14 +24,12 @@ private:
 
 	struct EntryDesc {
 		std::string mName;
-		std::shared_ptr<StructDesc> mChildDesc;
 
 		ssize_t (*mDescWriter) (EntryDesc *desc, ISink *sink);
 		ssize_t (*mValueWriter) (EntryDesc *desc, ISink *sink, void *base);
 
 		EntryDesc()
 		{
-			mChildDesc = nullptr;
 			mDescWriter = nullptr;
 			mValueWriter = nullptr;
 		}
@@ -75,10 +73,8 @@ private:
 public:
 	~StructDesc()
 	{
-		for (auto &e : mEntryDescList) {
-			e->mChildDesc.reset();
+		for (auto &e : mEntryDescList)
 			delete e;
-		}
 	}
 
 	template <typename T>
