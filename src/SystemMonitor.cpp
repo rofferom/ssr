@@ -17,6 +17,7 @@
 #include "StructDescRegistry.hpp"
 #include "System.hpp"
 #include "EventLoop.hpp"
+#include "Timer.hpp"
 
 namespace {
 
@@ -47,12 +48,10 @@ private:
 	SysStatsMonitor mSysMonitor;
 	std::list<ProcessMonitor *> mProcMonitors;
 
-	int mPeriodTimer;
+	Timer mPeriodTimer;
 
 private:
 	int findAllProcesses();
-
-	void periodTimerCb(int fd, int evt);
 
 public:
 	SystemMonitorImpl(
@@ -61,7 +60,7 @@ public:
 			const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
 
-	int init();
+	int startAcquisition();
 
 	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
@@ -79,7 +78,6 @@ SystemMonitorImpl::SystemMonitorImpl(
 	mCb = cb;
 	mSysSettings.mClkTck = sysconf(_SC_CLK_TCK);
 	mSysSettings.mPagesize = getpagesize();
-	mPeriodTimer = -1;
 }
 
 SystemMonitorImpl::~SystemMonitorImpl()
@@ -87,66 +85,29 @@ SystemMonitorImpl::~SystemMonitorImpl()
 	for (auto &m :mProcMonitors)
 		delete m;
 
-	if (mPeriodTimer != -1) {
-		mLoop->delFd(mPeriodTimer);
-		close(mPeriodTimer);
-	}
+	mPeriodTimer.clear();
 }
 
-void SystemMonitorImpl::periodTimerCb(int fd, int evt)
+int SystemMonitorImpl::startAcquisition()
 {
-	uint64_t expirations;
+	struct timespec ts;
 	int ret;
 
-	process();
+	auto cb = [this] () {
+		process();
+	};
 
-	ret = read(fd, &expirations, sizeof(expirations));
-	if (ret < 0)
-		printf("read() failed : %d(%m)\n", errno);
-}
+	ts.tv_sec = mConfig.mAcqPeriod;
+	ts.tv_nsec = 0;
 
-int SystemMonitorImpl::init()
-{
-	using namespace std::placeholders;
-	struct itimerspec timer;
-	int ret;
-
-	ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
+	ret = mPeriodTimer.setPeriodic(mLoop, ts, cb);
 	if (ret < 0) {
-		ret = -errno;
-		printf("timerfd_create() failed : %d(%m)\n", errno);
+		printf("Timer.setPeriodic() failed : %d(%s)\n",
+		       -ret, strerror(-ret));
 		return ret;
 	}
 
-	mPeriodTimer = ret;
-
-	// Start timer
-	timer.it_value.tv_sec = mConfig.mAcqPeriod;
-	timer.it_value.tv_nsec = 0;
-
-	timer.it_interval.tv_sec = mConfig.mAcqPeriod;
-	timer.it_interval.tv_nsec = 0;
-
-	ret = timerfd_settime(mPeriodTimer, 0, &timer, NULL);
-	if (ret < 0) {
-		printf("timerfd_settime() failed : %d(%m)\n", errno);
-		goto close_timerfd;
-	}
-
-	ret = mLoop->addFd(EPOLLIN, mPeriodTimer,
-			   std::bind(&SystemMonitorImpl::periodTimerCb, this, _1, _2));
-	if (ret < 0) {
-		printf("addFd() failed\n");
-		goto close_timerfd;
-	}
-
 	return 0;
-
-close_timerfd:
-	close(mPeriodTimer);
-	mPeriodTimer = -1;
-
-	return ret;
 }
 
 int SystemMonitorImpl::readSystemConfig(SystemConfig *config)
@@ -267,7 +228,7 @@ int SystemMonitor::create(
 	if (!monitor)
 		return -ENOMEM;
 
-	ret = monitor->init();
+	ret = monitor->startAcquisition();
 	if (ret < 0) {
 		delete monitor;
 		return ret;

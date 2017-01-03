@@ -15,18 +15,18 @@
 #include "SystemMonitor.hpp"
 #include "StructDescRegistry.hpp"
 #include "EventLoop.hpp"
+#include "Timer.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
 static struct Context {
 	bool stop;
 	EventLoop loop;
-	int durationTimer;
+	Timer durationTimer;
 
 	Context()
 	{
 		stop = false;
-		durationTimer = -1;
 	}
 } ctx;
 
@@ -256,7 +256,6 @@ static bool getOutputPath(const std::string &basePath, std::string *outPath)
 
 int main(int argc, char *argv[])
 {
-	struct itimerspec timer;
 	Params params;
 	std::string outputPath;
 	ProgramParameters progParameters;
@@ -363,34 +362,18 @@ int main(int argc, char *argv[])
 
 	// Create duration timer
 	if (params.duration > 0) {
-		ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
+		struct timespec duration;
+
+		auto cb = [] () {
+			ctx.stop = true;
+		};
+
+		duration.tv_sec = params.duration;
+		duration.tv_nsec = 0;
+
+		ret = ctx.durationTimer.set(&ctx.loop, duration, cb);
 		if (ret < 0) {
-			printf("timerfd_create() failed : %d(%m)\n", errno);
-			goto error;
-		}
-
-		ctx.durationTimer = ret;
-
-		// Start timer
-		timer.it_value.tv_sec = params.duration;
-		timer.it_value.tv_nsec = 0;
-
-		timer.it_interval.tv_sec = 0;
-		timer.it_interval.tv_nsec = 0;
-
-		ret = timerfd_settime(ctx.durationTimer, 0, &timer, NULL);
-		if (ret < 0) {
-			printf("timerfd_settime() failed : %d(%m)\n", errno);
-			goto error;
-		}
-
-		ret = ctx.loop.addFd(EPOLLIN, ctx.durationTimer,
-			[] (int fd, int evt) {
-				ctx.stop = true;
-			}
-		);
-		if (ret < 0) {
-			printf("addFd() failed\n");
+			printf("Time.setPeriodic() failed\n");
 			goto error;
 		}
 	}
@@ -407,9 +390,7 @@ int main(int argc, char *argv[])
 	delete mon;
 	delete recorder;
 
-
-	if (ctx.durationTimer != -1)
-		close(ctx.durationTimer);
+	ctx.durationTimer.clear();
 
 	return 0;
 
@@ -417,9 +398,7 @@ error:
 	delete mon;
 	delete recorder;
 
-
-	if (ctx.durationTimer != -1)
-		close(ctx.durationTimer);
+	ctx.durationTimer.clear();
 
 	return 1;
 }
