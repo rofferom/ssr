@@ -1,10 +1,6 @@
 #ifndef __SYSTEM_RECORDER_HPP__
 #define __SYSTEM_RECORDER_HPP__
 
-struct ProgramParameters {
-	char mParams[1024];
-};
-
 class SystemRecorder {
 private:
 	FILE *mFile;

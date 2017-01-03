@@ -35,6 +35,10 @@ struct Params {
 	}
 };
 
+struct ProgramParameters {
+	char mParams[1024];
+};
+
 static int readDecimalParam(int *out_v, const char *name)
 {
 	char *end;
