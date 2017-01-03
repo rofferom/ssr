@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "EventLoop.hpp"
 #include "System.hpp"
+#include "Log.hpp"
 #include "Timer.hpp"
 
 Timer::Timer()
@@ -31,13 +32,13 @@ int Timer::setInternal(EventLoop *loop, const struct itimerspec &ts, TimerCb cb)
 	mFd = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
 	if (mFd == -1) {
 		ret = -errno;
-		printf("timerfd_create() failed : %d(%m)\n", errno);
+		LOG_ERRNO("timerfd_create");
 		return ret;
 	}
 
 	ret = timerfd_settime(mFd, 0, &ts, NULL);
 	if (ret < 0) {
-		printf("timerfd_settime() failed : %d(%m)\n", errno);
+		LOG_ERRNO("timerfd_settime");
 		goto clear_timer;
 	}
 
@@ -49,13 +50,13 @@ int Timer::setInternal(EventLoop *loop, const struct itimerspec &ts, TimerCb cb)
 
 			ret = read(mFd, &expirations, sizeof(expirations));
 			if (ret < 0)
-				printf("read() failed : %d(%m)\n", errno);
+				LOG_ERRNO("read");
 
 			cb();
 		});
 	if (ret < 0) {
-		printf("EventLoop::addFd() failed : %d(%s)\n",
-		       -ret, strerror(-ret));
+		LOGE("EventLoop::addFd() failed : %d(%s)",
+		     -ret, strerror(-ret));
 		goto clear_timer;
 	}
 
@@ -101,8 +102,8 @@ int Timer::clear()
 
 	ret = mLoop->delFd(mFd);
 	if (ret < 0) {
-		printf("EventLoop::delFd() failed : %d(%s)\n",
-		       -ret, strerror(-ret));
+		LOGE("EventLoop::delFd() failed : %d(%s)",
+		     -ret, strerror(-ret));
 	}
 
 	close(mFd);

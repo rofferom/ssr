@@ -18,20 +18,20 @@
 
 #define RETURN_IF_REGISTER_FAILED(ret) \
 	if (ret < 0) { \
-		printf("%s:%d: register() failed : %d(%s)\n", \
-		       __FILE__, __LINE__, -ret, strerror(-ret)); \
+		LOGE("%s:%d: register() failed : %d(%s)", \
+		     __FILE__, __LINE__, -ret, strerror(-ret)); \
 	}
 
 #define RETURN_IF_REGISTER_TYPE_FAILED(ret, type) \
 	if (ret < 0) { \
-		printf("%s:%d: registerType(%s) failed : %d(%s)\n", \
-		       __FILE__, __LINE__, type, -ret, strerror(-ret)); \
+		LOGE("%s:%d: registerType(%s) failed : %d(%s)", \
+		     __FILE__, __LINE__, type, -ret, strerror(-ret)); \
 	}
 
 #define RETURN_IF_WRITE_FAILED(ret) \
 	if (ret < 0) { \
-		printf("%s:%d: registerType() failed : %d(%s)\n", \
-		       __FILE__, __LINE__, -ret, strerror(-ret)); \
+		LOGE("%s:%d: registerType() failed : %d(%s)", \
+		     __FILE__, __LINE__, -ret, strerror(-ret)); \
 	}
 
 class StructDesc {

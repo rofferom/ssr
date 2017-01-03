@@ -17,6 +17,7 @@
 #include "StructDescRegistry.hpp"
 #include "System.hpp"
 #include "EventLoop.hpp"
+#include "Log.hpp"
 #include "Timer.hpp"
 
 namespace {
@@ -29,7 +30,7 @@ int getTimeNs(uint64_t *ns)
 	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
 	if (ret < 0) {
 		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)", errno);
+		LOG_ERRNO("clock_gettime");
 		return ret;
 	}
 
@@ -94,6 +95,7 @@ int SystemMonitorImpl::startAcquisition()
 	int ret;
 
 	auto cb = [this] () {
+		LOGD("Start new acquisition");
 		process();
 	};
 
@@ -101,11 +103,8 @@ int SystemMonitorImpl::startAcquisition()
 	ts.tv_nsec = 0;
 
 	ret = mPeriodTimer.setPeriodic(mLoop, ts, cb);
-	if (ret < 0) {
-		printf("Timer.setPeriodic() failed : %d(%s)\n",
-		       -ret, strerror(-ret));
+	if (ret < 0)
 		return ret;
-	}
 
 	return 0;
 }
@@ -143,12 +142,8 @@ int SystemMonitorImpl::findAllProcesses()
 	int ret;
 
 	ret = pfstools::findAllProcesses(&processList);
-	if (ret < 0) {
-		printf("pfstools::findAllProcesses() failed : %d(%s\n)",
-		       ret, strerror(-ret));
-
+	if (ret < 0)
 		return ret;
-	}
 
 	for (auto pid :processList) {
 		monitor = new ProcessMonitor(pid, &mConfig, &mSysSettings);

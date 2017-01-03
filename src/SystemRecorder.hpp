@@ -36,7 +36,7 @@ public:
 
 		ret = StructDescRegistry::getType<T>(&type);
 		if (ret < 0) {
-			printf("Fail to get type %s\n", typeid(T).name());
+			LOGE("Fail to get type %s", typeid(T).name());
 			return ret;
 		}
 

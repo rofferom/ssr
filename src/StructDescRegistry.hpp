@@ -2,6 +2,7 @@
 #define __STRUCTDESCREGISTRY_HPP__
 
 #include <list>
+#include "Log.hpp"
 #include "StructDesc.hpp"
 
 #define STRUCT_DESC_REGISTRY_INVALID_ID -1
@@ -43,7 +44,7 @@ public:
 			return -EINVAL;
 
 		if (id != STRUCT_DESC_REGISTRY_INVALID_ID) {
-			printf("Type '%s' already registered\n", name);
+			LOGW("Type '%s' already registered", name);
 			return -EPERM;
 		}
 
@@ -53,7 +54,7 @@ public:
 		sEntryList.push_back(&EntryMap<T>::entry);
 
 		*desc = &EntryMap<T>::entry.mDesc;
-		printf("Type %s registered\n", name);
+		LOGD("Type %s registered", name);
 
 		return 0;
 	}
@@ -67,7 +68,7 @@ public:
 			return -EINVAL;
 
 		if (id == STRUCT_DESC_REGISTRY_INVALID_ID) {
-			printf("Trying to get an unknown type\n");
+			LOGE("Trying to get an unknown type");
 			return id;
 		}
 

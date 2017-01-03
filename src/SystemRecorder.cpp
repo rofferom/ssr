@@ -35,8 +35,8 @@ int SystemRecorder::writeHeader()
 
 	ret = StructDescRegistry::getTypeList(&typeList);
 	if (ret < 0) {
-		printf("Fail to get type list : %d(%s)\n",
-		       -ret, strerror(-ret));
+		LOGE("Fail to get type list : %d(%s)",
+		     -ret, strerror(-ret));
 		return ret;
 	}
 
@@ -78,7 +78,7 @@ int SystemRecorder::open(const char *path)
 	mFile = fopen(path, "wb");
 	if (!mFile) {
 		ret = -errno;
-		printf("Fail to open file '%s' : %d(%m)\n", path, errno);
+		LOGE("Fail to open file '%s' : %d(%m)", path, errno);
 		return ret;
 	}
 
@@ -129,7 +129,7 @@ int SystemRecorder::flush()
 	ret = fflush(mFile);
 	if (ret < 0) {
 		ret = -errno;
-		printf("fflush() failed : %d(%m)\n", errno);
+		LOG_ERRNO("fflush");
 		return ret;
 	}
 

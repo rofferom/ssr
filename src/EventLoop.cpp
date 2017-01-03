@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include "System.hpp"
+#include "Log.hpp"
 #include "EventLoop.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
@@ -28,7 +29,7 @@ int EventLoop::init()
 	mEpollFd = epoll_create1(EPOLL_CLOEXEC);
 	if (mEpollFd == -1) {
 		ret = -errno;
-		printf("epoll_create1() failed : %d(%m)", errno);
+		LOG_ERRNO("epoll_create1");
 		return ret;
 	}
 
@@ -36,7 +37,7 @@ int EventLoop::init()
 	mStopFd = eventfd(0, EFD_CLOEXEC);
 	if (mStopFd < 0) {
 		ret = -errno;
-		printf("eventfd() failed : %d(%m)\n", errno);
+		LOG_ERRNO("eventfd");
 		goto clear_epollfd;
 	}
 
@@ -47,7 +48,7 @@ int EventLoop::init()
 	ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, mStopFd, &evt);
 	if (ret < 0) {
 		ret = -errno;
-		printf("epoll_ctl() failed : %d(%m)\n", errno);
+		LOG_ERRNO("epoll_ctl");
 		goto clear_stopfd;
 	}
 
@@ -78,7 +79,7 @@ int EventLoop::wait(int timeout)
 
 	if (ret == -1) {
 		ret = -errno;
-		printf("epoll_wait() failed : %d(%m)\n", ret);
+		LOG_ERRNO("epoll_wait");
 		return ret;
 	}
 
@@ -91,7 +92,7 @@ int EventLoop::wait(int timeout)
 
 		ret = findInternalFd(events[i].data.fd, &internalFd);
 		if (ret < 0) {
-			printf("fd %d doesn't exist\n", events[i].data.fd);
+			LOGE("fd %d doesn't exist", events[i].data.fd);
 			continue;
 		}
 
@@ -108,7 +109,7 @@ int EventLoop::abort()
 
 	ret = write(mStopFd, &stop, sizeof(stop));
 	if (ret < 0)
-		printf("write() failed : %d(%m)\n", errno);
+		LOG_ERRNO("write");
 
 	return 0;
 }
@@ -123,7 +124,7 @@ void EventLoop::readStopFd()
 	} while (ret == -1 && errno == EINTR);
 
 	if (ret < 0)
-		printf("read() failed : %d(%m)\n", errno);
+		LOG_ERRNO("read");
 }
 
 int EventLoop::findInternalFd(int fd,
@@ -152,7 +153,7 @@ int EventLoop::addFd(int op, int fd, EventLoopCb cb)
 	// Check fd isn't already registered
 	ret = findInternalFd(fd, &internalFd);
 	if (ret == 0) {
-		printf("fd %d already exists\n", fd);
+		LOGE("fd %d already exists", fd);
 		return -EPERM;
 	}
 
@@ -164,7 +165,7 @@ int EventLoop::addFd(int op, int fd, EventLoopCb cb)
 	ret = epoll_ctl(mEpollFd, EPOLL_CTL_ADD, fd, &evt);
 	if (ret == -1) {
 		ret = -errno;
-		printf("epoll_ctl() failed : %d(%m)\n", errno);
+		LOG_ERRNO("epoll_ctl");
 		return ret;
 	}
 
@@ -186,7 +187,7 @@ int EventLoop::modFd(int op, int fd, EventLoopCb cb)
 	// Check fd isn't already registered
 	ret = findInternalFd(fd, &internalFd);
 	if (ret < 0) {
-		printf("fd %d doesn't exists\n", fd);
+		LOGE("fd %d doesn't exists", fd);
 		return -EPERM;
 	}
 
@@ -198,7 +199,7 @@ int EventLoop::modFd(int op, int fd, EventLoopCb cb)
 	ret = epoll_ctl(mEpollFd, EPOLL_CTL_MOD, fd, &evt);
 	if (ret == -1) {
 		ret = -errno;
-		printf("epoll_ctl() failed : %d(%m)\n", errno);
+		LOG_ERRNO("epoll_ctl");
 		return ret;
 	}
 
@@ -213,7 +214,7 @@ int EventLoop::delFd(int fd)
 	// Check fd isn't already registered
 	ret = findInternalFd(fd, &internalFd);
 	if (ret < 0) {
-		printf("fd %d doesn't exists\n", fd);
+		LOGE("fd %d doesn't exists", fd);
 		return -EPERM;
 	}
 
@@ -221,7 +222,7 @@ int EventLoop::delFd(int fd)
 	ret = epoll_ctl(mEpollFd, EPOLL_CTL_DEL, fd, NULL);
 	if (ret == -1) {
 		ret = -errno;
-		printf("epoll_ctl() failed : %d(%m)\n", errno);
+		LOG_ERRNO("epoll_ctl");
 		return ret;
 	}
 

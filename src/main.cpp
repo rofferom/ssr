@@ -16,6 +16,7 @@
 #include "StructDescRegistry.hpp"
 #include "EventLoop.hpp"
 #include "Timer.hpp"
+#include "Log.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
@@ -32,6 +33,7 @@ static struct Context {
 
 struct Params {
 	bool help;
+	bool verbose;
 	std::string output;
 	int period;
 	int duration;
@@ -40,6 +42,7 @@ struct Params {
 	Params()
 	{
 		help = false;
+		verbose = false;
 		period = 1;
 		duration = -1;
 		recordThreads = true;
@@ -55,16 +58,16 @@ static int readDecimalParam(int *out_v, const char *name)
 	v = strtol(optarg, &end, 10);
 	if (errno != 0) {
 		int ret = -errno;
-		printf("Unable to parse '%s' %s : %d(%m)\n",
-		       name, optarg, errno);
+		fprintf(stderr, "Unable to parse '%s' %s : %d(%m)\n",
+			name, optarg, errno);
 		return ret;
 	} else if (*end != '\0') {
-		printf("'%s' arg '%s' is not decimal\n",
-		        name, optarg);
+		fprintf(stderr, "'%s' arg '%s' is not decimal\n",
+			name, optarg);
 		return -EINVAL;
 	} else if (v <= 0) {
-		printf("'%s' arg '%s' is negative or null\n",
-		       name, optarg);
+		fprintf(stderr, "'%s' arg '%s' is negative or null\n",
+			name, optarg);
 		return -EINVAL;
 	}
 
@@ -81,6 +84,7 @@ int parseArgs(int argc, char *argv[], Params *params)
 
 	const struct option argsOptions[] = {
 		{ "help"  ,          optional_argument, 0, 'h' },
+		{ "verbose",         optional_argument, 0, 'v' },
 		{ "period",          optional_argument, 0, 'p' },
 		{ "duration",        optional_argument, 0, 'd' },
 		{ "output",          required_argument, 0, 'o' },
@@ -89,13 +93,17 @@ int parseArgs(int argc, char *argv[], Params *params)
 	};
 
 	while (true) {
-		value = getopt_long(argc, argv, "ho:p:d:", argsOptions, &optionIndex);
+		value = getopt_long(argc, argv, "hvo:p:d:", argsOptions, &optionIndex);
 		if (value == -1 || value == '?')
 			break;
 
 		switch (value) {
 		case 'h':
 			params->help = true;
+			break;
+
+		case 'v':
+			params->verbose = true;
 			break;
 
 		case 'o':
@@ -136,6 +144,7 @@ void printUsage(int argc, char *argv[])
 
 	printf("optional arguments:\n");
 	printf("  %-20s %s\n", "-h, --help", "show this help message and exit");
+	printf("  %-20s %s\n", "-v, --verbose", "add extra logs");
 	printf("  %-20s %s\n", "-p, --period", "sample acquisition period (seconds). Default : 1");
 	printf("  %-20s %s\n", "-d, --duration", "acquisition duration (seconds). Default : infinite");
 	printf("  %-20s %s\n", "-o, --output", "output record file");
@@ -144,7 +153,7 @@ void printUsage(int argc, char *argv[])
 
 static void sighandler(int s)
 {
-	printf("stop\n");
+	LOGN("stop");
 	ctx.stop = true;
 	ctx.loop.abort();
 }
@@ -181,7 +190,7 @@ static void systemStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void processStatsCb(
@@ -193,7 +202,7 @@ static void processStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void threadStatsCb(
@@ -205,7 +214,7 @@ static void threadStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void acquisitionDurationCb(
@@ -217,7 +226,7 @@ static void acquisitionDurationCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void buildProgParameters(int argc, char *argv[], ProgramParameters *out)
@@ -280,13 +289,16 @@ int main(int argc, char *argv[])
 		printUsage(argc, argv);
 		return 1;
 	} else if (params.output.empty()) {
-		printf("No output file specified\n\n");
+		LOGE("No output file specified");
 		printUsage(argc, argv);
 		return 1;
 	}
 
+	if (params.verbose)
+		logSetLevel(LOG_DEBUG);
+
 	if (optind == argc) {
-		printf("Record all processes\n");
+		LOGI("Record all processes\n");
 		recordAllProcesses = true;
 	} else {
 		recordAllProcesses = false;
@@ -300,7 +312,7 @@ int main(int argc, char *argv[])
 	// Init StructDesc
 	ret = initStructDescs();
 	if (ret < 0) {
-		printf("Fail to initialize struct descriptions\n");
+		LOGE("Fail to initialize struct descriptions");
 		return 1;
 	}
 
@@ -310,11 +322,11 @@ int main(int argc, char *argv[])
 		goto error;
 
 	if (!getOutputPath(params.output, &outputPath)) {
-		printf("Can find a new output file path\n");
+		LOGE("Can find a new output file path");
 		return 1;
 	}
 
-	printf("Recording in file %s\n", outputPath.c_str());
+	LOGI("Recording in file %s", outputPath.c_str());
 	ret = recorder->open(outputPath.c_str());
 	if (ret < 0)
 		goto error;
@@ -337,7 +349,7 @@ int main(int argc, char *argv[])
 		for (int i = optind; i < argc; i++) {
 			ret = mon->addProcess(argv[i]);
 			if (ret < 0) {
-				printf("addProcessFailed() : %d(%s)\n",
+				LOGE("addProcessFailed() : %d(%s)",
 				       -ret, strerror(-ret));
 				goto error;
 			}
@@ -354,7 +366,8 @@ int main(int argc, char *argv[])
 	// Write system config
 	ret = mon->readSystemConfig(&systemConfig);
 	if (ret < 0) {
-		printf("readSystemConfig() failed : %d(%m)\n", errno);
+		LOGE("readSystemConfig() failed : %d(%s)",
+		     -ret, strerror(-ret));
 		goto error;
 	}
 
@@ -373,7 +386,7 @@ int main(int argc, char *argv[])
 
 		ret = ctx.durationTimer.set(&ctx.loop, duration, cb);
 		if (ret < 0) {
-			printf("Time.setPeriodic() failed\n");
+			LOGE("Time.setPeriodic() failed");
 			goto error;
 		}
 	}
