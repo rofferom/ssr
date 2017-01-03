@@ -1,12 +1,6 @@
 #ifndef __SYSTEM_RECORDER_HPP__
 #define __SYSTEM_RECORDER_HPP__
 
-#include <stdio.h>
-#include <errno.h>
-#include "SystemMonitor.hpp"
-#include "FileSink.hpp"
-#include "StructDescRegistry.hpp"
-
 struct ProgramParameters {
 	char mParams[1024];
 };

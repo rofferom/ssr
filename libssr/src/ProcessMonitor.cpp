@@ -1,15 +1,7 @@
-#include <string.h>
 #include <fcntl.h>
-#include <dirent.h>
 #include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-
-#include <map>
-
-#include "Log.hpp"
-#include "ProcFsTools.hpp"
-#include "ProcessMonitor.hpp"
+#include <dirent.h>
+#include "ssr_priv.hpp"
 
 #define INVALID_PID -1
 

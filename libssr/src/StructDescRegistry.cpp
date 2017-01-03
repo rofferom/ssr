@@ -1,4 +1,4 @@
-#include "StructDescRegistry.hpp"
+#include "ssr_priv.hpp"
 
 int StructDescRegistry::sNextId = 0;
 

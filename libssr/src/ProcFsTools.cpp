@@ -1,14 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <dirent.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
-
-#include "Log.hpp"
-#include "ProcFsTools.hpp"
+#include <unistd.h>
+#include <dirent.h>
+#include "ssr_priv.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 

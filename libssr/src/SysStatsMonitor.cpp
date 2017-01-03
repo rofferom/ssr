@@ -1,9 +1,6 @@
-#include <stdio.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include "Log.hpp"
-#include "SysStatsMonitor.hpp"
+#include "ssr_priv.hpp"
 
 #define PROCSTAT_PATH "/proc/stat"
 

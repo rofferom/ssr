@@ -1,11 +1,6 @@
 #ifndef __SYSTEM_MONITOR_HPP__
 #define __SYSTEM_MONITOR_HPP__
 
-#include <stdint.h>
-#include <list>
-
-#include <functional>
-
 class EventLoop;
 
 class SystemMonitor {

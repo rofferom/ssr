@@ -1,10 +1,6 @@
 #ifndef __LOG_HPP__
 #define __LOG_HPP__
 
-#include <stdint.h>
-#include <stdarg.h>
-#include <string.h>
-
 enum LogLevel {
 	LOG_CRIT,
 	LOG_ERR,

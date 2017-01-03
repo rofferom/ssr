@@ -1,8 +1,6 @@
 #ifndef __SYS_STATS_MONITOR__
 #define __SYS_STATS_MONITOR__
 
-#include "ProcFsTools.hpp"
-
 class SysStatsMonitor {
 private:
 	int mFd;

@@ -1,22 +1,10 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
 #include <getopt.h>
 #include <signal.h>
-#include <poll.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
 #include <string>
 
-#include "System.hpp"
-#include "SystemRecorder.hpp"
-#include "SystemMonitor.hpp"
-#include "StructDescRegistry.hpp"
-#include "EventLoop.hpp"
-#include "Timer.hpp"
-#include "Log.hpp"
+#include <ssr.hpp>
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 

@@ -1,24 +1,5 @@
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <dirent.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <time.h>
-
-#include <string>
-#include <list>
-#include <map>
-
-#include "ProcessMonitor.hpp"
-#include "SysStatsMonitor.hpp"
-#include "SystemMonitor.hpp"
-#include "ProcFsTools.hpp"
-#include "StructDescRegistry.hpp"
-#include "System.hpp"
-#include "EventLoop.hpp"
-#include "Log.hpp"
-#include "Timer.hpp"
+#include "ssr_priv.hpp"
 
 namespace {
 

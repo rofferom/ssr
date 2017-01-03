@@ -1,8 +1,4 @@
-#include <stdio.h>
-#include <stdint.h>
-#include <errno.h>
-#include "StructDescRegistry.hpp"
-#include "SystemRecorder.hpp"
+#include "ssr_priv.hpp"
 
 #define FILE_FORMAT_VERSION 1
 

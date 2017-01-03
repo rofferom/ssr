@@ -1,8 +1,6 @@
 #ifndef __TIMER_HPP__
 #define __TIMER_HPP__
 
-#include <functional>
-
 class EventLoop;
 
 typedef std::function<void()> TimerCb;

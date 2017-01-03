@@ -1,10 +1,6 @@
 #ifndef __EVENTLOOP_HPP__
 #define __EVENTLOOP_HPP__
 
-#include <sys/epoll.h>
-#include <list>
-#include <functional>
-
 typedef std::function<void(int fd, int evt)> EventLoopCb;
 
 class EventLoop {

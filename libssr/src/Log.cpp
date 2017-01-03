@@ -1,5 +1,4 @@
-#include <stdio.h>
-#include "Log.hpp"
+#include "ssr_priv.hpp"
 
 static uint32_t sLogLevel = LOG_INFO;
 

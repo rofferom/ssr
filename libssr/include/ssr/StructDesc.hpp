@@ -1,11 +1,6 @@
 #ifndef __STRUCTDESC_HPP__
 #define __STRUCTDESC_HPP__
 
-#include <string>
-#include <memory>
-#include "FileSink.hpp"
-#include "StructDescTypes.hpp"
-
 #define offsetof(type, member)  __builtin_offsetof (type, member)
 
 #define REGISTER_RAW_VALUE(desc, _class_, field, name) \

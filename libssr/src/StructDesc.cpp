@@ -1,4 +1,4 @@
-#include "StructDesc.hpp"
+#include "ssr_priv.hpp"
 
 template <>
 ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base)

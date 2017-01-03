@@ -1,10 +1,6 @@
 #ifndef __STRUCTDESCREGISTRY_HPP__
 #define __STRUCTDESCREGISTRY_HPP__
 
-#include <list>
-#include "Log.hpp"
-#include "StructDesc.hpp"
-
 #define STRUCT_DESC_REGISTRY_INVALID_ID -1
 
 class StructDescRegistry {

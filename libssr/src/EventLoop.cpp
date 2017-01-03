@@ -1,7 +1,5 @@
 #include <unistd.h>
-#include "System.hpp"
-#include "Log.hpp"
-#include "EventLoop.hpp"
+#include "ssr_priv.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
