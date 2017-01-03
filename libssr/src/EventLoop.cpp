@@ -1,8 +1,6 @@
 #include <unistd.h>
 #include "ssr_priv.hpp"
 
-#define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
-
 EventLoop::EventLoop()
 {
 	mEpollFd = -1;

@@ -3,8 +3,6 @@
 #include <dirent.h>
 #include "ssr_priv.hpp"
 
-#define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
-
 namespace {
 
 typedef bool (*TokenizerCb) (

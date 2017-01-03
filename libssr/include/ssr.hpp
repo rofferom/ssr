@@ -25,4 +25,6 @@
 #include <ssr/SystemMonitor.hpp>
 #include <ssr/SystemRecorder.hpp>
 
+#define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
+
 #endif // !__SSR_HPP__

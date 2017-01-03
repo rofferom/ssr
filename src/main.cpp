@@ -6,8 +6,6 @@
 
 #include <ssr.hpp>
 
-#define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
-
 static struct Context {
 	bool stop;
 	EventLoop loop;
