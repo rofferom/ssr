@@ -3,9 +3,19 @@
 
 class SysStatsMonitor {
 private:
-	int mFd;
-	pfstools::RawStats mRawStats;
+	// /proc/stat
+	int mProcStatFd;
+	pfstools::RawStats mRawProcStats;
 
+	// /proc/meminfo
+	int mMeminfoFd;
+	pfstools::RawStats mRawMemInfo;
+
+private:
+	static int checkStatFile(
+		int *fd,
+		const char *path,
+		pfstools::RawStats *rawStats);
 public:
 	SysStatsMonitor();
 	~SysStatsMonitor();

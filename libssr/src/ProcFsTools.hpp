@@ -20,6 +20,8 @@ int readRawStats(int fd, RawStats *stats);
 
 int readSystemStats(char *s, SystemMonitor::SystemStats *stats);
 
+int readMeminfoStats(char *s, SystemMonitor::SystemStats *stats);
+
 int readProcessStats(const char *s, SystemMonitor::ProcessStats *stats);
 
 int readThreadStats(const char *s, SystemMonitor::ThreadStats *stats);

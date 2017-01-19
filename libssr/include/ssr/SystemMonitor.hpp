@@ -27,6 +27,11 @@ public:
 		uint64_t    mIrqCount;
 		uint64_t    mSoftIrqCount;
 		uint64_t    mCtxSwitchCount;
+
+		// Ram usage
+		uint64_t    mRamTotal;
+		uint64_t    mRamAvailable;
+		uint64_t    mRamFree;
 	};
 
 	struct ProcessStats {

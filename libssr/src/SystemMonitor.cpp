@@ -275,6 +275,15 @@ int SystemMonitor::initStructDescs()
 	ret = REGISTER_RAW_VALUE(desc, SystemStats, mCtxSwitchCount, "ctxswitchcount");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mRamTotal, "ramtotal");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mRamAvailable, "ramavailable");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, SystemStats, mRamFree, "ramfree");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	// ProcessStats
 	type = "processstats";
 

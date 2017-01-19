@@ -460,6 +460,112 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 	return 0;
 }
 
+enum MeminfoFields {
+	MEMINFO_FIELDS_TOTAL     = (1 << 0),
+	MEMINFO_FIELDS_AVAILABLE = (1 << 1),
+	MEMINFO_FIELDS_FREE      = (1 << 2),
+
+	MEMINFO_FIELDS_ALL       = ((1 << 3) - 1)
+};
+
+struct MeminfoParam {
+	const char *name;
+	uint64_t value;
+};
+
+int meminfoGetParameterName(char *s, char **end)
+{
+	char *p;
+
+	p = strchr(s, ':');
+	if (!p)
+		return -ENOENT;
+
+	*p = '\0';
+	*end = p + 1;
+
+	return 0;
+}
+
+int meminfoGetUnitScale(const char *unit, int *scale)
+{
+	static const struct {
+		const char *name;
+		int scale;
+	} units[] = {
+		{ "kB", 1024 }
+	};
+	size_t i;
+
+	for (i = 0; i < SIZEOF_ARRAY(units); i++) {
+		if (!strcmp(units[i].name, unit)) {
+			*scale = units[i].scale;
+			return 0;
+		}
+	}
+
+	return -EINVAL;
+}
+
+int meminfoParseLine(char *s, MeminfoParam *result)
+{
+	char *paramEnd;
+	long int v;
+	int scale;
+	int ret;
+
+	/**
+	 * Example of cases to parse :
+	 * - MemTotal:       16324024 kB
+	 * - HugePages_Total:       0
+	 */
+
+	// Extract the first part
+	ret = meminfoGetParameterName(s, &paramEnd);
+	if (ret < 0) {
+		LOGE("Failed to get parameter name for line '%s' : %d(%s)\n",
+		     s, -ret, strerror(-ret));
+		return ret;
+	}
+
+	result->name = s;
+	s = paramEnd;
+
+	// Skip spaces
+	for (; *s != '\0' && *s == ' '; s++);
+
+	// Extract size
+	v = strtol(s, &paramEnd, 10);
+	if (errno == ERANGE || errno == EINVAL)
+		return -errno;
+	else if (s == paramEnd)
+		return -EINVAL;
+
+	s = paramEnd;
+
+	// Return if there is no unit
+	if (*s == '\0') {
+		result->value = v;
+		return 0;
+	}
+
+	// If there is an unit, the first following char should be a space
+	if (*s != ' ')
+		return -EINVAL;
+
+	s++;
+
+	ret = meminfoGetUnitScale(s, &scale);
+	if (ret < 0) {
+		LOGW("Unsupported unit %s", s);
+		return ret;
+	}
+
+	result->value = v * scale;
+
+	return 0;
+}
+
 } // anonymous namespace
 
 namespace pfstools {
@@ -661,6 +767,69 @@ int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
 
 		s = end + 1;
 	}
+
+	return 0;
+}
+
+int readMeminfoStats(char *s, SystemMonitor::SystemStats *stats)
+{
+	const struct {
+		const char *name;
+		uint32_t field;
+		uint64_t *value;
+	} fields[] = {
+		{
+			"MemTotal",
+			MEMINFO_FIELDS_TOTAL,
+			&stats->mRamTotal
+		}, {
+			"MemFree",
+			MEMINFO_FIELDS_AVAILABLE,
+			&stats->mRamAvailable
+		}, {
+			"MemAvailable",
+			MEMINFO_FIELDS_FREE,
+			&stats->mRamFree
+		}
+	};
+	uint32_t remainingFields = MEMINFO_FIELDS_ALL;
+
+	MeminfoParam memParam;
+	bool endOfString = false;
+	char *end;
+	int line;
+	size_t i;
+	int ret;
+
+	for (line = 0; remainingFields && !endOfString; line++) {
+		ret = getNextLine(s, &end, &endOfString);
+		if (ret < 0)
+			return ret;
+
+		memset(&memParam, 0, sizeof(memParam));
+		ret = meminfoParseLine(s, &memParam);
+		if (ret < 0)
+			return ret;
+
+		for (i = 0; i < SIZEOF_ARRAY(fields); i++) {
+			if (strcmp(memParam.name, fields[i].name) == 0) {
+				if (!(remainingFields & fields[i].field)) {
+					LOGW("Parameter '%s' already fetched",
+					     fields[i].name);
+					break;
+				}
+
+				*fields[i].value = memParam.value;
+				remainingFields &= ~fields[i].field;
+				break;
+			}
+		}
+
+		s = end + 1;
+	}
+
+	if (remainingFields)
+		return -EINVAL;
 
 	return 0;
 }
