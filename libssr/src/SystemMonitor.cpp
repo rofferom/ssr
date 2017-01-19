@@ -34,6 +34,7 @@ private:
 
 private:
 	int findAllProcesses();
+	int process();
 
 public:
 	SystemMonitorImpl(
@@ -47,7 +48,6 @@ public:
 	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
 	virtual int loadProcesses();
-	virtual int process();
 };
 
 SystemMonitorImpl::SystemMonitorImpl(

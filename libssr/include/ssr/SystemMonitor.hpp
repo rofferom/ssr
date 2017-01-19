@@ -97,7 +97,6 @@ public:
 	virtual int addProcess(const char *name) = 0;
 
 	virtual int loadProcesses() = 0;
-	virtual int process() = 0;
 
 	static int create(
 			EventLoop *loop,
