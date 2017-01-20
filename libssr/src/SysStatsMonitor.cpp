@@ -75,7 +75,6 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	// Check /proc/stat status
 	ret = checkStatFile(&mProcStatFd, PROCSTAT_PATH, &mRawProcStats);
 	if (ret != -EAGAIN) {
-		LOGI("Read /proc/stat");
 		if (ret < 0) {
 			LOGI("%s:%d", __FILE__, __LINE__);
 			return ret;
@@ -94,7 +93,6 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	// Check /proc/meminfo
 	ret = checkStatFile(&mMeminfoFd, MEMINFO_PATH, &mRawMemInfo);
 	if (ret != -EAGAIN) {
-		LOGI("Read /proc/meminfo");
 		if (ret < 0) {
 			LOGI("%s:%d", __FILE__, __LINE__);
 			return ret;
