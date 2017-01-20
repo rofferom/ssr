@@ -103,6 +103,10 @@ public:
 
 	virtual int loadProcesses() = 0;
 
+	virtual int clearProcesses() = 0;
+
+	virtual int setAcqPeriod(int acqPeriod) = 0;
+
 	static int create(
 			EventLoop *loop,
 			const Config &config,

@@ -48,6 +48,8 @@ public:
 	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
 	virtual int loadProcesses();
+	virtual int clearProcesses();
+	virtual int setAcqPeriod(int acqPeriod);
 };
 
 SystemMonitorImpl::SystemMonitorImpl(
@@ -149,6 +151,26 @@ int SystemMonitorImpl::loadProcesses()
 
 	for (auto m :mProcMonitors)
 		m->init();
+
+	return 0;
+}
+
+int SystemMonitorImpl::clearProcesses()
+{
+	for (auto m :mProcMonitors)
+		delete m;
+
+	mProcMonitors.clear();
+
+	return 0;
+}
+
+int SystemMonitorImpl::setAcqPeriod(int acqPeriod)
+{
+	mConfig.mAcqPeriod = acqPeriod;
+
+	mPeriodTimer.clear();
+	startAcquisition();
 
 	return 0;
 }
