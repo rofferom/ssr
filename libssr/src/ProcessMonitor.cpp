@@ -251,9 +251,12 @@ int ProcessMonitor::cleanProcessAndThreadsFd()
 	if (mResearchType == ResearchType::byName)
 		mPid = INVALID_PID;
 
-	// Close process fd
-	close(mStatFd);
-	mStatFd = -1;
+	// Close process fd. If the process hasn't been found, the fd is not
+	// valid.
+	if (mStatFd != -1) {
+		close(mStatFd);
+		mStatFd = -1;
+	}
 
 	// Close threads fd
 	for (auto p : mThreads)
