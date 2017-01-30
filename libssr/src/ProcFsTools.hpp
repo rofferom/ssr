@@ -1,11 +1,6 @@
 #ifndef __PROCSTATPARSER_HPP__
 #define __PROCSTATPARSER_HPP__
 
-#include <string>
-#include <list>
-
-#include "SystemMonitor.hpp"
-
 #define STAT_SIZE 4096*2
 
 namespace pfstools {

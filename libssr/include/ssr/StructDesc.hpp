@@ -1,11 +1,6 @@
 #ifndef __STRUCTDESC_HPP__
 #define __STRUCTDESC_HPP__
 
-#include <string>
-#include <memory>
-#include "FileSink.hpp"
-#include "StructDescTypes.hpp"
-
 #define offsetof(type, member)  __builtin_offsetof (type, member)
 
 #define REGISTER_RAW_VALUE(desc, _class_, field, name) \
@@ -16,6 +11,24 @@
 	(desc)->registerRawValue<const char *>( \
 			name, offsetof(_class_, field))
 
+#define RETURN_IF_REGISTER_FAILED(ret) \
+	if (ret < 0) { \
+		LOGE("%s:%d: register() failed : %d(%s)", \
+		     __FILE__, __LINE__, -ret, strerror(-ret)); \
+	}
+
+#define RETURN_IF_REGISTER_TYPE_FAILED(ret, type) \
+	if (ret < 0) { \
+		LOGE("%s:%d: registerType(%s) failed : %d(%s)", \
+		     __FILE__, __LINE__, type, -ret, strerror(-ret)); \
+	}
+
+#define RETURN_IF_WRITE_FAILED(ret) \
+	if (ret < 0) { \
+		LOGE("%s:%d: registerType() failed : %d(%s)", \
+		     __FILE__, __LINE__, -ret, strerror(-ret)); \
+	}
+
 class StructDesc {
 private:
 	enum EntryType : uint8_t {
@@ -24,14 +37,12 @@ private:
 
 	struct EntryDesc {
 		std::string mName;
-		std::shared_ptr<StructDesc> mChildDesc;
 
 		ssize_t (*mDescWriter) (EntryDesc *desc, ISink *sink);
 		ssize_t (*mValueWriter) (EntryDesc *desc, ISink *sink, void *base);
 
 		EntryDesc()
 		{
-			mChildDesc = nullptr;
 			mDescWriter = nullptr;
 			mValueWriter = nullptr;
 		}
@@ -75,10 +86,8 @@ private:
 public:
 	~StructDesc()
 	{
-		for (auto &e : mEntryDescList) {
-			e->mChildDesc.reset();
+		for (auto &e : mEntryDescList)
 			delete e;
-		}
 	}
 
 	template <typename T>
@@ -111,7 +120,7 @@ public:
 		return 0;
 	}
 
-	int writeValueInternal(ISink *sink, void *p)
+	int writeValueInternal(ISink *sink, void *p) const
 	{
 		for (auto &desc: mEntryDescList)
 			desc->mValueWriter(desc, sink, p);
@@ -120,17 +129,13 @@ public:
 	}
 
 	template <typename T>
-	int writeValue(ISink *sink, T *p)
+	int writeValue(ISink *sink, T *p) const
 	{
 		return writeValueInternal(sink, (void *) p);
 	}
 };
 
 template <>
-ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base)
-{
-	std::ptrdiff_t p = (std::ptrdiff_t ) base + desc->mParams.raw.offset;
-	return ValueTrait<const char *>::write(sink, (const char *) p);
-}
+ssize_t StructDesc::valueWriterRaw<const char *>(EntryDesc *desc, ISink *sink, void *base);
 
 #endif // !__STRUCTDESC_HPP__

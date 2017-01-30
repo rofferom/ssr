@@ -1,13 +1,7 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
-#include <dirent.h>
-#include <unistd.h>
 #include <fcntl.h>
-#include <time.h>
-
-#include "ProcFsTools.hpp"
+#include <unistd.h>
+#include <dirent.h>
+#include "ssr_priv.hpp"
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
@@ -268,7 +262,7 @@ bool testPidName(int pid, const char *name)
 	fd = open(path, O_RDONLY|O_CLOEXEC);
 	if (fd == -1) {
 		ret = -errno;
-		printf("Fail to open %s : %d(%m)\n", path, errno);
+		LOGE("Fail to open %s : %d(%m)", path, errno);
 		return ret;
 	}
 
@@ -443,7 +437,7 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 	d = opendir("/proc");
 	if (!d) {
 		ret = -errno;
-		printf("Fail to open /proc : %d(%m)\n", errno);
+		LOGE("Fail to open /proc : %d(%m)", errno);
 		return ret;
 	}
 
@@ -454,7 +448,7 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 
 		pid = strtol(entry.d_name, &endptr, 10);
 		if (errno == ERANGE) {
-			printf("Ignore %s\n", entry.d_name);
+			LOGW("Ignore %s", entry.d_name);
 			continue;
 		} else if (*endptr != '\0') {
 			continue;
@@ -541,7 +535,7 @@ static int getTimeNs(uint64_t *ns)
 	ret = clock_gettime(CLOCK_MONOTONIC, &ts);
 	if (ret < 0) {
 		ret = -errno;
-		printf("clock_gettime() failed : %d(%m)\n", errno);
+		LOG_ERRNO("clock_gettime");
 		return ret;
 	}
 
@@ -564,7 +558,7 @@ int readRawStats(int fd, RawStats *stats)
 	if (readRet == -1) {
 		ret = -errno;
 		stats->mPending = false;
-		printf("read() failed : %d(%m)\n", errno);
+		LOG_ERRNO("read");
 		return ret;
 	}
 

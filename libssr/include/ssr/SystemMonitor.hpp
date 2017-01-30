@@ -1,10 +1,7 @@
 #ifndef __SYSTEM_MONITOR_HPP__
 #define __SYSTEM_MONITOR_HPP__
 
-#include <stdint.h>
-#include <list>
-
-#include <functional>
+class EventLoop;
 
 class SystemMonitor {
 public:
@@ -83,10 +80,12 @@ public:
 
 	struct Config {
 		bool mRecordThreads;
+		int mAcqPeriod; // seconds
 
 		Config()
 		{
 			mRecordThreads = true;
+			mAcqPeriod = 1;
 		}
 	};
 
@@ -100,7 +99,13 @@ public:
 	virtual int loadProcesses() = 0;
 	virtual int process() = 0;
 
-	static SystemMonitor *create(const Config &config, const Callbacks &cb);
+	static int create(
+			EventLoop *loop,
+			const Config &config,
+			const Callbacks &cb,
+			SystemMonitor **monitor);
+
+	static int initStructDescs();
 };
 
 #endif // !__SYSTEM_MONITOR_HPP__

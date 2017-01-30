@@ -1,38 +1,27 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <errno.h>
 #include <getopt.h>
 #include <signal.h>
-#include <poll.h>
-#include <unistd.h>
 #include <sys/stat.h>
 
 #include <string>
 
-#include "System.hpp"
-#include "SystemRecorder.hpp"
-#include "SystemMonitor.hpp"
+#include <ssr.hpp>
 
 #define SIZEOF_ARRAY(array) (sizeof(array)/sizeof(array[0]))
 
 static struct Context {
 	bool stop;
-	int stopfd;
-	int timer;
-	int durationTimer;
+	EventLoop loop;
+	Timer durationTimer;
 
 	Context()
 	{
 		stop = false;
-		stopfd = -1;
-		timer = -1;
-		durationTimer = -1;
 	}
 } ctx;
 
 struct Params {
 	bool help;
+	bool verbose;
 	std::string output;
 	int period;
 	int duration;
@@ -41,6 +30,7 @@ struct Params {
 	Params()
 	{
 		help = false;
+		verbose = false;
 		period = 1;
 		duration = -1;
 		recordThreads = true;
@@ -56,16 +46,16 @@ static int readDecimalParam(int *out_v, const char *name)
 	v = strtol(optarg, &end, 10);
 	if (errno != 0) {
 		int ret = -errno;
-		printf("Unable to parse '%s' %s : %d(%m)\n",
-		       name, optarg, errno);
+		fprintf(stderr, "Unable to parse '%s' %s : %d(%m)\n",
+			name, optarg, errno);
 		return ret;
 	} else if (*end != '\0') {
-		printf("'%s' arg '%s' is not decimal\n",
-		        name, optarg);
+		fprintf(stderr, "'%s' arg '%s' is not decimal\n",
+			name, optarg);
 		return -EINVAL;
 	} else if (v <= 0) {
-		printf("'%s' arg '%s' is negative or null\n",
-		       name, optarg);
+		fprintf(stderr, "'%s' arg '%s' is negative or null\n",
+			name, optarg);
 		return -EINVAL;
 	}
 
@@ -82,6 +72,7 @@ int parseArgs(int argc, char *argv[], Params *params)
 
 	const struct option argsOptions[] = {
 		{ "help"  ,          optional_argument, 0, 'h' },
+		{ "verbose",         optional_argument, 0, 'v' },
 		{ "period",          optional_argument, 0, 'p' },
 		{ "duration",        optional_argument, 0, 'd' },
 		{ "output",          required_argument, 0, 'o' },
@@ -90,13 +81,17 @@ int parseArgs(int argc, char *argv[], Params *params)
 	};
 
 	while (true) {
-		value = getopt_long(argc, argv, "ho:p:d:", argsOptions, &optionIndex);
+		value = getopt_long(argc, argv, "hvo:p:d:", argsOptions, &optionIndex);
 		if (value == -1 || value == '?')
 			break;
 
 		switch (value) {
 		case 'h':
 			params->help = true;
+			break;
+
+		case 'v':
+			params->verbose = true;
 			break;
 
 		case 'o':
@@ -137,6 +132,7 @@ void printUsage(int argc, char *argv[])
 
 	printf("optional arguments:\n");
 	printf("  %-20s %s\n", "-h, --help", "show this help message and exit");
+	printf("  %-20s %s\n", "-v, --verbose", "add extra logs");
 	printf("  %-20s %s\n", "-p, --period", "sample acquisition period (seconds). Default : 1");
 	printf("  %-20s %s\n", "-d, --duration", "acquisition duration (seconds). Default : infinite");
 	printf("  %-20s %s\n", "-o, --output", "output record file");
@@ -145,14 +141,32 @@ void printUsage(int argc, char *argv[])
 
 static void sighandler(int s)
 {
-	int64_t stop = 1;
+	LOGN("stop");
+	ctx.stop = true;
+	ctx.loop.abort();
+}
+
+static int initStructDescs()
+{
+	StructDesc *desc;
+	const char *type;
 	int ret;
 
-	printf("stop\n");
-	ctx.stop = true;
-	ret = write(ctx.stopfd, &stop, sizeof(stop));
+	// ProgramParameters
+	type = "programparameters";
+
+	ret = StructDescRegistry::registerType<ProgramParameters>(type, &desc);
+	RETURN_IF_REGISTER_TYPE_FAILED(ret, type);
+
+	ret = REGISTER_STRING(desc, ProgramParameters, mParams, "params");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	// Initialize other available StructDesc
+	ret = SystemMonitor::initStructDescs();
 	if (ret < 0)
-		printf("write() failed : %d(%m)\n", errno);
+		return 0;
+
+	return 0;
 }
 
 static void systemStatsCb(
@@ -164,7 +178,7 @@ static void systemStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void processStatsCb(
@@ -176,7 +190,7 @@ static void processStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void threadStatsCb(
@@ -188,7 +202,7 @@ static void threadStatsCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void acquisitionDurationCb(
@@ -200,7 +214,7 @@ static void acquisitionDurationCb(
 
 	ret = recorder->record(stats);
 	if (ret < 0)
-		printf("record() failed : %d(%s)\n", -ret, strerror(-ret));
+		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
 static void buildProgParameters(int argc, char *argv[], ProgramParameters *out)
@@ -239,9 +253,6 @@ static bool getOutputPath(const std::string &basePath, std::string *outPath)
 
 int main(int argc, char *argv[])
 {
-	struct itimerspec timer;
-	struct pollfd fds[3];
-	int fdsCount;
 	Params params;
 	std::string outputPath;
 	ProgramParameters progParameters;
@@ -266,29 +277,44 @@ int main(int argc, char *argv[])
 		printUsage(argc, argv);
 		return 1;
 	} else if (params.output.empty()) {
-		printf("No output file specified\n\n");
+		LOGE("No output file specified");
 		printUsage(argc, argv);
 		return 1;
 	}
 
+	if (params.verbose)
+		logSetLevel(LOG_DEBUG);
+
 	if (optind == argc) {
-		printf("Record all processes\n");
+		LOGI("Record all processes\n");
 		recordAllProcesses = true;
 	} else {
 		recordAllProcesses = false;
 	}
 
+	// Init loop
+	ret = ctx.loop.init();
+	if (ret < 0)
+		return 1;
+
+	// Init StructDesc
+	ret = initStructDescs();
+	if (ret < 0) {
+		LOGE("Fail to initialize struct descriptions");
+		return 1;
+	}
+
 	// Create recorder
-	recorder = SystemRecorder::create();
+	recorder = new SystemRecorder();
 	if (!recorder)
 		goto error;
 
 	if (!getOutputPath(params.output, &outputPath)) {
-		printf("Can find a new output file path\n");
+		LOGE("Can find a new output file path");
 		return 1;
 	}
 
-	printf("Recording in file %s\n", outputPath.c_str());
+	LOGI("Recording in file %s", outputPath.c_str());
 	ret = recorder->open(outputPath.c_str());
 	if (ret < 0)
 		goto error;
@@ -301,16 +327,17 @@ int main(int argc, char *argv[])
 	cb.mUserdata = recorder;
 
 	monConfig.mRecordThreads = params.recordThreads;
+	monConfig.mAcqPeriod = params.period;
 
-	mon = SystemMonitor::create(monConfig, cb);
-	if (!mon)
+	ret = SystemMonitor::create(&ctx.loop, monConfig, cb, &mon);
+	if (ret < 0)
 		goto error;
 
 	if (!recordAllProcesses) {
 		for (int i = optind; i < argc; i++) {
 			ret = mon->addProcess(argv[i]);
 			if (ret < 0) {
-				printf("addProcessFailed() : %d(%s)\n",
+				LOGE("addProcessFailed() : %d(%s)",
 				       -ret, strerror(-ret));
 				goto error;
 			}
@@ -327,115 +354,35 @@ int main(int argc, char *argv[])
 	// Write system config
 	ret = mon->readSystemConfig(&systemConfig);
 	if (ret < 0) {
-		printf("readSystemConfig() failed : %d(%m)\n", errno);
+		LOGE("readSystemConfig() failed : %d(%s)",
+		     -ret, strerror(-ret));
 		goto error;
 	}
 
 	recorder->record(systemConfig);
 
-	// Create stopfd
-	ret = eventfd(0, EFD_CLOEXEC);
-	if (ret < 0) {
-		printf("eventfd() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	ctx.stopfd = ret;
-
-	fds[0].fd = ctx.stopfd;
-	fds[0].events = POLLIN;
-	fds[0].revents = 0;
-
-	// Create timer
-	ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
-	if (ret < 0) {
-		printf("timerfd_create() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	ctx.timer = ret;
-
-	// Start timer
-	timer.it_interval.tv_sec = params.period;
-	timer.it_interval.tv_nsec = 0;
-
-	timer.it_value.tv_sec = params.period;
-	timer.it_value.tv_nsec = 0;
-
-	ret = timerfd_settime(ctx.timer, 0, &timer, NULL);
-	if (ret < 0) {
-		printf("timerfd_settime() failed : %d(%m)\n", errno);
-		goto error;
-	}
-
-	fds[1].fd = ctx.timer;
-	fds[1].events = POLLIN;
-	fds[1].revents = 0;
-
-	fdsCount = 2;
-
 	// Create duration timer
 	if (params.duration > 0) {
-		ret = timerfd_create(CLOCK_MONOTONIC, EFD_CLOEXEC);
+		struct timespec duration;
+
+		auto cb = [] () {
+			ctx.stop = true;
+		};
+
+		duration.tv_sec = params.duration;
+		duration.tv_nsec = 0;
+
+		ret = ctx.durationTimer.set(&ctx.loop, duration, cb);
 		if (ret < 0) {
-			printf("timerfd_create() failed : %d(%m)\n", errno);
+			LOGE("Time.setPeriodic() failed");
 			goto error;
 		}
-
-		ctx.durationTimer = ret;
-
-		// Start timer
-		timer.it_value.tv_sec = params.duration;
-		timer.it_value.tv_nsec = 0;
-
-		timer.it_interval.tv_sec = 0;
-		timer.it_interval.tv_nsec = 0;
-
-		ret = timerfd_settime(ctx.durationTimer, 0, &timer, NULL);
-		if (ret < 0) {
-			printf("timerfd_settime() failed : %d(%m)\n", errno);
-			goto error;
-		}
-
-		fds[2].fd = ctx.durationTimer;
-		fds[2].events = POLLIN;
-		fds[2].revents = 0;
-
-		fdsCount++;
-	} else {
-		fds[2].fd = -1;
-		fds[2].events = 0;
-		fds[2].revents = 0;
 	}
 
 	// Start poll
-	while (true) {
-		do {
-			ret = poll(fds, fdsCount, -1);
-		} while (ret == -1 && errno == EINTR);
-
-		if (ret == -1) {
-			printf("poll() failed : %d(%m)\n", errno);
-			goto error;
-		} else if (ret == 0) {
-			printf("poll() : timeout\n");
-			continue;
-		}
-
-		if (ctx.stop)
-			break;
-
-		if (fds[1].revents & POLLIN) {
-			uint64_t expirations;
-
-			mon->process();
-
-			ret = read(fds[1].fd, &expirations, sizeof(expirations));
-			if (ret < 0)
-				printf("read() failed : %d(%m)\n", errno);
-		}
-
-		if (fds[2].revents & POLLIN)
+	while (!ctx.stop) {
+		ret = ctx.loop.wait(-1);
+		if (ret < 0)
 			break;
 	}
 
@@ -444,14 +391,7 @@ int main(int argc, char *argv[])
 	delete mon;
 	delete recorder;
 
-	if (ctx.stopfd != -1)
-		close(ctx.stopfd);
-
-	if (ctx.timer != -1)
-		close(ctx.timer);
-
-	if (ctx.durationTimer != -1)
-		close(ctx.durationTimer);
+	ctx.durationTimer.clear();
 
 	return 0;
 
@@ -459,14 +399,7 @@ error:
 	delete mon;
 	delete recorder;
 
-	if (ctx.stopfd != -1)
-		close(ctx.stopfd);
-
-	if (ctx.timer != -1)
-		close(ctx.timer);
-
-	if (ctx.durationTimer != -1)
-		close(ctx.durationTimer);
+	ctx.durationTimer.clear();
 
 	return 1;
 }

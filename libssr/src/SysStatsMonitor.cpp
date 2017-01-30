@@ -1,9 +1,6 @@
-#include <stdio.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
-
-#include "SysStatsMonitor.hpp"
+#include "ssr_priv.hpp"
 
 #define PROCSTAT_PATH "/proc/stat"
 
@@ -36,8 +33,8 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 		ret = open(PROCSTAT_PATH, O_RDONLY|O_CLOEXEC);
 		if (ret == -1) {
 			ret = -errno;
-			printf("Fail to open %s : %d(%m)\n",
-			       PROCSTAT_PATH, errno);
+			LOGE("Fail to open %s : %d(%m)",
+			     PROCSTAT_PATH, errno);
 			return ret;
 		}
 

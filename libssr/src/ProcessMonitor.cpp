@@ -1,14 +1,7 @@
-#include <string.h>
 #include <fcntl.h>
-#include <dirent.h>
 #include <unistd.h>
-#include <errno.h>
-#include <stdlib.h>
-
-#include <map>
-
-#include "ProcFsTools.hpp"
-#include "ProcessMonitor.hpp"
+#include <dirent.h>
+#include "ssr_priv.hpp"
 
 #define INVALID_PID -1
 
@@ -59,7 +52,7 @@ int ProcessMonitor::addNewThread(int tid)
 	ret = open(path, O_RDONLY|O_CLOEXEC);
 	if (ret == -1) {
 		ret = -errno;
-		printf("Fail to open %s : %d(%m)\n", path, errno);
+		LOGE("Fail to open %s : %d(%m)", path, errno);
 		return ret;
 	}
 
@@ -82,13 +75,13 @@ int ProcessMonitor::addNewThread(int tid)
 		 tid,
 		 stats.mName);
 
-	printf("Found new thread %s for process %d\n",
-	       info.mName, mPid);
+	LOGN("Found new thread %s for process %d",
+	     info.mName, mPid);
 
 	// Register thread
 	auto insertRet = mThreads.insert( {tid, info} );
 	if (!insertRet.second) {
-		printf("Fail to insert thread %d\n", tid);
+		LOGE("Fail to insert thread %d", tid);
 		close(info.mFd);
 		return -EPERM;
 	}
@@ -111,15 +104,15 @@ int ProcessMonitor::findNewThreads()
 	d = opendir(path);
 	if (!d) {
 		ret = -errno;
-		printf("Fail to open /proc : %d(%m)\n", errno);
+		LOGE("Fail to open /proc : %d(%m)", errno);
 		return ret;
 	}
 
 	while (true) {
 		ret = readdir_r(d, &entry, &result);
 		if (ret > 0) {
-			printf("readdir_r() failed : %d(%s)\n",
-			       ret, strerror(ret));
+			LOGE("readdir_r() failed : %d(%s)",
+			     ret, strerror(ret));
 			ret = -ret;
 			goto closedir;
 		} else if (ret == 0 && !result) {
@@ -128,7 +121,7 @@ int ProcessMonitor::findNewThreads()
 
 		tid = strtol(entry.d_name, &endptr, 10);
 		if (errno == ERANGE) {
-			printf("Ignore %s\n", entry.d_name);
+			LOGE("Ignore %s", entry.d_name);
 			continue;
 		} else if (*endptr != '\0') {
 			continue;
@@ -138,7 +131,7 @@ int ProcessMonitor::findNewThreads()
 		if (mThreads.count(tid) == 0) {
 			ret = addNewThread(tid);
 			if (ret < 0)
-				printf("Fail to add thread %d\n", tid);
+				LOGE("Fail to add thread %d", tid);
 		}
 	}
 
@@ -222,7 +215,7 @@ int ProcessMonitor::openProcessAndThreadsFd()
 		break;
 
 	default:
-		printf("Research type unknown : %d\n", (int) mResearchType);
+		LOGE("Research type unknown : %d", (int) mResearchType);
 		return -EINVAL;
 	}
 
@@ -232,16 +225,16 @@ int ProcessMonitor::openProcessAndThreadsFd()
 	if (mStatFd == -1) {
 		mState = AcqState::failed;
 		ret = -errno;
-		printf("Fail to open %s : %d(%m)\n", path, errno);
+		LOGE("Fail to open %s : %d(%m)", path, errno);
 		return ret;
 	}
 
 	mState = AcqState::started;
 
 	if (mResearchType == ResearchType::byName)
-		printf("Found process '%s' : pid %d\n", mName.c_str(), mPid);
+		LOGN("Found process '%s' : pid %d", mName.c_str(), mPid);
 	else
-		printf("Found process %d\n", mPid);
+		LOGN("Found process %d", mPid);
 
 	// Find threads
 	if (mConfig->mRecordThreads) {
@@ -294,10 +287,10 @@ int ProcessMonitor::readRawStats()
 	ret = pfstools::readRawStats(mStatFd, &mRawStats);
 	if (ret < 0) {
 		if (!mName.empty()) {
-			printf("Process %d-%s has stopped\n",
-			       mPid, mName.c_str());
+			LOGN("Process %d-%s has stopped",
+			     mPid, mName.c_str());
 		} else {
-			printf("Process %d has stopped\n", mPid);
+			LOGN("Process %d has stopped", mPid);
 		}
 
 		cleanProcessAndThreadsFd();
@@ -334,8 +327,8 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 
 		if (mName.empty()) {
 			mName = processStats.mName;
-			printf("Process %d name found : %s\n",
-			       mPid, processStats.mName);
+			LOGN("Process %d name found : %s",
+			     mPid, processStats.mName);
 		}
 
 		if (cb.mProcessStats) {

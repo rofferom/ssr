@@ -1,11 +1,6 @@
 #ifndef __FILESINK_HPP__
 #define __FILESINK_HPP__
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <memory>
-
 class ISink {
 public:
 	virtual ~ISink() {}

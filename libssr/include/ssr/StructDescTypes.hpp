@@ -1,12 +1,6 @@
 #ifndef __STRUCTDESCTYPES_HPP__
 #define __STRUCTDESCTYPES_HPP__
 
-#include <string.h>
-#include <assert.h>
-#include <arpa/inet.h>
-
-#include <list>
-
 enum RawValueType : uint8_t {
 	RAW_VALUE_TYPE_U8 = 0,
 	RAW_VALUE_TYPE_I8,
