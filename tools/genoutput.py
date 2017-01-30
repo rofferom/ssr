@@ -328,8 +328,9 @@ def getGenerator(outputPath):
 def parseArgs():
 	parser = argparse.ArgumentParser(description='Parse sysstats log file.')
 	parser.add_argument('-i', '--input', required=True, help='File to parse')
-	parser.add_argument('-o', '--output', help='File to generate')
-	parser.add_argument('-S', '--struct', default=DEFAULT_STRUCTNAME, help='Struct name to use')
+	parser.add_argument('-o', '--output', help='File to generate. Depending on the extension the format will be html or csv.')
+	parser.add_argument('-S', '--struct', default=DEFAULT_STRUCTNAME, help='Struct name to use : \
+systemstats | processstats | threadstats')
 	parser.add_argument('-s', '--sample', default=DEFAULT_SAMPLENAME, help='Sample name to use')
 	parser.add_argument('-H', '--header', action='store_true', help='Display input header')
 	parser.add_argument('--filter-outliers', action='store_true', help='Filter outliers')
