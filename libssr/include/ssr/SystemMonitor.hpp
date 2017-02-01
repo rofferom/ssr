@@ -69,7 +69,9 @@ public:
 		void (*mSystemStats) (const SystemStats &stats, void *userdata);
 		void (*mProcessStats) (const ProcessStats &stats, void *userdata);
 		void (*mThreadStats) (const ThreadStats &stats, void *userdata);
-		void (*mAcquisitionDuration) (const AcquisitionDuration &stats, void *userdata);
+
+		void (*mResultsBegin) (const AcquisitionDuration &stats, void *userdata);
+		void (*mResultsEnd) (void *userdata);
 
 		void *mUserdata;
 
@@ -78,7 +80,8 @@ public:
 			mSystemStats = nullptr;
 			mProcessStats = nullptr;
 			mThreadStats = nullptr;
-			mAcquisitionDuration = nullptr;
+			mResultsBegin = nullptr;
+			mResultsEnd = nullptr;
 			mUserdata = nullptr;
 		}
 	};

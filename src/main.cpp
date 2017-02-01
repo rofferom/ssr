@@ -207,7 +207,7 @@ static void threadStatsCb(
 		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
 }
 
-static void acquisitionDurationCb(
+static void resultsBeginCb(
 		const SystemMonitor::AcquisitionDuration &stats,
 		void *userdata)
 {
@@ -325,7 +325,7 @@ int main(int argc, char *argv[])
 	cb.mSystemStats = systemStatsCb;
 	cb.mProcessStats = processStatsCb;
 	cb.mThreadStats = threadStatsCb;
-	cb.mAcquisitionDuration = acquisitionDurationCb;
+	cb.mResultsBegin = resultsBeginCb;
 	cb.mUserdata = recorder;
 
 	monConfig.mRecordThreads = params.recordThreads;

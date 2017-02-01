@@ -196,14 +196,17 @@ int SystemMonitorImpl::process()
 	if (ret < 0)
 		return ret;
 
-	if (mCb.mAcquisitionDuration)
-		mCb.mAcquisitionDuration(stats, mCb.mUserdata);
+	if (mCb.mResultsBegin)
+		mCb.mResultsBegin(stats, mCb.mUserdata);
 
 	// Process fetched data
 	mSysMonitor.processRawStats(mCb);
 
 	for (auto &m :mProcMonitors)
 		m->processRawStats(mCb);
+
+	if (mCb.mResultsEnd)
+		mCb.mResultsEnd(mCb.mUserdata);
 
 	return 0;
 }
