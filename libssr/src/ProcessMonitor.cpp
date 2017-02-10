@@ -75,7 +75,7 @@ int ProcessMonitor::addNewThread(int tid)
 		 tid,
 		 stats.mName);
 
-	LOGN("Found new thread %s for process %d",
+	LOGD("Found new thread %s for process %d",
 	     info.mName, mPid);
 
 	// Register thread
@@ -232,9 +232,9 @@ int ProcessMonitor::openProcessAndThreadsFd()
 	mState = AcqState::started;
 
 	if (mResearchType == ResearchType::byName)
-		LOGN("Found process '%s' : pid %d", mName.c_str(), mPid);
+		LOGD("Found process '%s' : pid %d", mName.c_str(), mPid);
 	else
-		LOGN("Found process %d", mPid);
+		LOGD("Found process %d", mPid);
 
 	// Find threads
 	if (mConfig->mRecordThreads) {
@@ -330,7 +330,7 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 
 		if (mName.empty()) {
 			mName = processStats.mName;
-			LOGN("Process %d name found : %s",
+			LOGD("Process %d name found : %s",
 			     mPid, processStats.mName);
 		}
 
