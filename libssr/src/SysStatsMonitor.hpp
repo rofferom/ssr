@@ -16,9 +16,14 @@ private:
 		int *fd,
 		const char *path,
 		pfstools::RawStats *rawStats);
+
+	static int openFile(const char *path, int *fd);
+
 public:
 	SysStatsMonitor();
 	~SysStatsMonitor();
+
+	int init();
 
 	int readRawStats();
 	int processRawStats(const SystemMonitor::Callbacks &cb);

@@ -22,6 +22,14 @@ int getTimeNs(uint64_t *ns)
 
 class SystemMonitorImpl : public SystemMonitor {
 private:
+	enum class State {
+		Stopped,
+		Started,
+	};
+
+private:
+	State mState;
+
 	EventLoop *mLoop;
 	Config mConfig;
 	Callbacks mCb;
@@ -34,7 +42,7 @@ private:
 
 private:
 	int findAllProcesses();
-	int process();
+	int makeAcquisition();
 
 public:
 	SystemMonitorImpl(
@@ -43,13 +51,15 @@ public:
 			const Callbacks &cb);
 	virtual ~SystemMonitorImpl();
 
-	int startAcquisition();
+	int startAcquisitionTimer();
 
 	virtual int readSystemConfig(SystemConfig *config);
 	virtual int addProcess(const char *name);
 	virtual int loadProcesses();
 	virtual int clearProcesses();
 	virtual int setAcqPeriod(int acqPeriod);
+	virtual int start();
+	virtual int stop();
 };
 
 SystemMonitorImpl::SystemMonitorImpl(
@@ -57,6 +67,7 @@ SystemMonitorImpl::SystemMonitorImpl(
 		const Config &config,
 		const Callbacks &cb) : SystemMonitor()
 {
+	mState = State::Stopped;
 	mLoop = loop;
 	mConfig = config;
 	mCb = cb;
@@ -72,14 +83,14 @@ SystemMonitorImpl::~SystemMonitorImpl()
 	mPeriodTimer.clear();
 }
 
-int SystemMonitorImpl::startAcquisition()
+int SystemMonitorImpl::startAcquisitionTimer()
 {
 	struct timespec ts;
 	int ret;
 
 	auto cb = [this] () {
 		LOGD("Start new acquisition");
-		process();
+		makeAcquisition();
 	};
 
 	ts.tv_sec = mConfig.mAcqPeriod;
@@ -169,13 +180,67 @@ int SystemMonitorImpl::setAcqPeriod(int acqPeriod)
 {
 	mConfig.mAcqPeriod = acqPeriod;
 
-	mPeriodTimer.clear();
-	startAcquisition();
+	if (mState == State::Started) {
+		int ret;
+
+		mPeriodTimer.clear();
+
+		ret = startAcquisitionTimer();
+		if (ret < 0) {
+			LOGW("startAcquisitionTimer() failed : %d(%s)",
+			     -ret, strerror(-ret));
+			return ret;
+		}
+	}
 
 	return 0;
 }
 
-int SystemMonitorImpl::process()
+int SystemMonitorImpl::start()
+{
+	int ret;
+
+	ret = mSysMonitor.init();
+	if (ret < 0) {
+		LOGW("mSysMonitor.init() failed : %d(%s)",
+		     -ret, strerror(-ret));
+		return ret;
+	}
+
+	ret = startAcquisitionTimer();
+	if (ret < 0) {
+		LOGW("startAcquisitionTimer() failed : %d(%s)",
+		     -ret, strerror(-ret));
+		return ret;
+	}
+
+	ret = makeAcquisition();
+	if (ret < 0) {
+		LOGW("makeAcquisition() failed : %d(%s)",
+		     -ret, strerror(-ret));
+		return ret;
+
+	}
+
+	mState = State::Started;
+
+	return 0;
+}
+
+int SystemMonitorImpl::stop()
+{
+	int ret;
+
+	ret = mPeriodTimer.clear();
+	if (ret < 0)
+		return ret;
+
+	mState = State::Stopped;
+
+	return 0;
+}
+
+int SystemMonitorImpl::makeAcquisition()
 {
 	AcquisitionDuration stats;
 	int ret;
@@ -220,7 +285,6 @@ int SystemMonitor::create(
 		SystemMonitor **outMonitor)
 {
 	SystemMonitorImpl *monitor;
-	int ret;
 
 	if (!loop || !outMonitor)
 		return -EINVAL;
@@ -228,12 +292,6 @@ int SystemMonitor::create(
 	monitor = new SystemMonitorImpl(loop, config, cb);
 	if (!monitor)
 		return -ENOMEM;
-
-	ret = monitor->startAcquisition();
-	if (ret < 0) {
-		delete monitor;
-		return ret;
-	}
 
 	*outMonitor = monitor;
 

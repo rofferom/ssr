@@ -381,6 +381,13 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	ret = mon->start();
+	if (ret < 0) {
+		LOGE("mon->start() failed : %d(%s)",
+			 -ret, strerror(-ret));
+		goto error;
+	}
+
 	// Start poll
 	while (!ctx.stop) {
 		ret = ctx.loop.wait(-1);

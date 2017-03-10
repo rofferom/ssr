@@ -23,6 +23,30 @@ SysStatsMonitor::~SysStatsMonitor()
 		close(mMeminfoFd);
 }
 
+int SysStatsMonitor::init()
+{
+	openFile(PROCSTAT_PATH, &mProcStatFd);
+	openFile(MEMINFO_PATH, &mMeminfoFd);
+
+	return 0;
+}
+
+int SysStatsMonitor::openFile(const char *path, int *fd)
+{
+	int ret;
+
+	ret = open(path, O_RDONLY|O_CLOEXEC);
+	if (ret == -1) {
+		ret = -errno;
+		LOGE("Fail to open %s : %d(%m)", path, errno);
+		return ret;
+	}
+
+	*fd = ret;
+
+	return 0;
+}
+
 int SysStatsMonitor::readRawStats()
 {
 	int ret;
@@ -48,22 +72,14 @@ int SysStatsMonitor::checkStatFile(
 {
 	int ret;
 
-	if (*fd == -1) {
-		ret = open(path, O_RDONLY|O_CLOEXEC);
-		if (ret == -1) {
-			ret = -errno;
-			LOGE("Fail to open %s : %d(%m)", path, errno);
-			return ret;
-		}
+	if (*fd == -1)
+		ret = openFile(path, fd);
+	else if (!rawStats->mPending)
+		ret = -EAGAIN;
+	else
+		ret = 0;
 
-		*fd = ret;
-
-		return -EAGAIN;
-	} else if (!rawStats->mPending) {
-		return -EAGAIN;
-	}
-
-	return 0;
+	return ret;
 }
 
 int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)

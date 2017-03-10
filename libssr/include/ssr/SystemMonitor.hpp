@@ -110,6 +110,10 @@ public:
 
 	virtual int setAcqPeriod(int acqPeriod) = 0;
 
+	virtual int start() = 0;
+
+	virtual int stop() = 0;
+
 	static int create(
 			EventLoop *loop,
 			const Config &config,
