@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <getopt.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -46,7 +47,7 @@ static int readDecimalParam(int *out_v, const char *name)
 
 	errno = 0;
 	v = strtol(optarg, &end, 10);
-	if (errno != 0) {
+	if (v == LONG_MIN || v == LONG_MAX || errno == EINVAL) {
 		int ret = -errno;
 		fprintf(stderr, "Unable to parse '%s' %s : %d(%m)\n",
 			name, optarg, errno);

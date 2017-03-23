@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -445,7 +446,7 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 			break;
 
 		pid = strtol(entry.d_name, &endptr, 10);
-		if (errno == ERANGE) {
+		if (pid == LONG_MIN || pid == LONG_MAX || errno == EINVAL) {
 			LOGW("Ignore %s", entry.d_name);
 			continue;
 		} else if (*endptr != '\0') {
@@ -536,7 +537,7 @@ int meminfoParseLine(char *s, MeminfoParam *result)
 
 	// Extract size
 	v = strtol(s, &paramEnd, 10);
-	if (errno == ERANGE || errno == EINVAL)
+	if (v == LONG_MIN || v == LONG_MAX || errno == EINVAL)
 		return -errno;
 	else if (s == paramEnd)
 		return -EINVAL;

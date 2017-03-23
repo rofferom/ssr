@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
@@ -120,7 +121,7 @@ int ProcessMonitor::findNewThreads()
 		}
 
 		tid = strtol(entry.d_name, &endptr, 10);
-		if (errno == ERANGE) {
+		if (tid == LONG_MIN || tid == LONG_MAX || errno == EINVAL) {
 			LOGE("Ignore %s", entry.d_name);
 			continue;
 		} else if (*endptr != '\0') {
