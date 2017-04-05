@@ -511,7 +511,7 @@ int meminfoGetUnitScale(const char *unit, int *scale)
 int meminfoParseLine(char *s, MeminfoParam *result)
 {
 	char *paramEnd;
-	long int v;
+	uint64_t v;
 	int scale;
 	int ret;
 
@@ -536,8 +536,8 @@ int meminfoParseLine(char *s, MeminfoParam *result)
 	for (; *s != '\0' && *s == ' '; s++);
 
 	// Extract size
-	v = strtol(s, &paramEnd, 10);
-	if (v == LONG_MIN || v == LONG_MAX || errno == EINVAL)
+	v = strtoull(s, &paramEnd, 10);
+	if (v == ULLONG_MAX || errno == EINVAL)
 		return -errno;
 	else if (s == paramEnd)
 		return -EINVAL;
