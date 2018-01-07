@@ -423,8 +423,7 @@ bool processCtxSwitchCountCb(int idx,
 int iterateAllPid(PidFoundCb cb, void *userdata)
 {
 	DIR *d;
-	struct dirent entry;
-	struct dirent *result = nullptr;
+	struct dirent *result;
 	int pid;
 	char *endptr;
 	int ret;
@@ -440,14 +439,22 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 		return ret;
 	}
 
+	ret = 0;
 	while (process) {
-		ret = readdir_r(d, &entry, &result);
-		if (ret == 0 && !result)
+		errno = 0;
+		result = readdir(d);
+		if (!result && !errno) {
 			break;
+		} else if (!result && errno) {
+			ret = -errno;
+			LOGE("readdir() failed : %d(%s)",
+				 errno, strerror(errno));
+			break;
+		}
 
-		pid = strtol(entry.d_name, &endptr, 10);
+		pid = strtol(result->d_name, &endptr, 10);
 		if (pid == LONG_MIN || pid == LONG_MAX || errno == EINVAL) {
-			LOGW("Ignore %s", entry.d_name);
+			LOGW("Ignore %s", result->d_name);
 			continue;
 		} else if (*endptr != '\0') {
 			continue;
@@ -458,7 +465,7 @@ int iterateAllPid(PidFoundCb cb, void *userdata)
 
 	closedir(d);
 
-	return 0;
+	return ret;
 }
 
 enum MeminfoFields {

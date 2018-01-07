@@ -93,8 +93,7 @@ int ProcessMonitor::addNewThread(int tid)
 int ProcessMonitor::findNewThreads()
 {
 	DIR *d;
-	struct dirent entry;
-	struct dirent *result = nullptr;
+	struct dirent *result;
 	char path[128];
 	int tid;
 	char *endptr;
@@ -109,20 +108,22 @@ int ProcessMonitor::findNewThreads()
 		return ret;
 	}
 
+	ret = 0;
 	while (true) {
-		ret = readdir_r(d, &entry, &result);
-		if (ret > 0) {
-			LOGE("readdir_r() failed : %d(%s)",
-			     ret, strerror(ret));
-			ret = -ret;
-			goto closedir;
-		} else if (ret == 0 && !result) {
+		errno = 0;
+		result = readdir(d);
+		if (!result && !errno) {
+			break;
+		} else if (!result && errno) {
+			ret = -errno;
+			LOGE("readdir() failed : %d(%s)",
+				 errno, strerror(errno));
 			break;
 		}
 
-		tid = strtol(entry.d_name, &endptr, 10);
+		tid = strtol(result->d_name, &endptr, 10);
 		if (tid == LONG_MIN || tid == LONG_MAX || errno == EINVAL) {
-			LOGE("Ignore %s", entry.d_name);
+			LOGE("Ignore %s", result->d_name);
 			continue;
 		} else if (*endptr != '\0') {
 			continue;
@@ -136,11 +137,6 @@ int ProcessMonitor::findNewThreads()
 		}
 	}
 
-	closedir(d);
-
-	return 0;
-
-closedir:
 	closedir(d);
 
 	return ret;
