@@ -88,10 +88,10 @@ def readU64(f):
 	return v
 
 def readI64(f):
+	b = f.read(8)
 	if len(b) < 8:
 		raise EOFException
 
-	b = f.read(8)
 	(v, ) = struct.unpack('!q', b)
 	return v
 
