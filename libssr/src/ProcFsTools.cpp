@@ -49,9 +49,13 @@ enum ProcStatIdx {
 	PROCSTAT_IDX_NAME = 1,
 	PROCSTAT_IDX_UTIME = 13,
 	PROCSTAT_IDX_STIME = 14,
+	PROCSTAT_IDX_PRIORITY = 17,
+	PROCSTAT_IDX_NICE = 18,
 	PROCSTAT_IDX_THREADCOUNT= 19,
 	PROCSTAT_IDX_VSIZE = 22,
-	PROCSTAT_IDX_RSS = 23
+	PROCSTAT_IDX_RSS = 23,
+	PROCSTAT_IDX_RT_PRIORITY = 39,
+	PROCSTAT_IDX_POLICY = 40,
 };
 
 enum ParserState {
@@ -175,6 +179,22 @@ bool processStatsCb(int idx,
 
 	case PROCSTAT_IDX_RSS:
 		stats->mRss = atoi(buf);
+		break;
+
+	case PROCSTAT_IDX_PRIORITY:
+		stats->mPriority = atoll(buf);
+		break;
+
+	case PROCSTAT_IDX_NICE:
+		stats->mNice = atoll(buf);
+		break;
+
+	case PROCSTAT_IDX_RT_PRIORITY:
+		stats->mRtPriority = atoi(buf);
+		break;
+
+	case PROCSTAT_IDX_POLICY:
+		stats->mPolicy = atoi(buf);
 		ret = false;
 		break;
 
@@ -215,6 +235,22 @@ bool threadStatsCb(int idx,
 
 	case PROCSTAT_IDX_STIME:
 		stats->mStime = atoll(buf);
+		break;
+
+	case PROCSTAT_IDX_PRIORITY:
+		stats->mPriority = atoll(buf);
+		break;
+
+	case PROCSTAT_IDX_NICE:
+		stats->mNice = atoll(buf);
+		break;
+
+	case PROCSTAT_IDX_RT_PRIORITY:
+		stats->mRtPriority = atoi(buf);
+		break;
+
+	case PROCSTAT_IDX_POLICY:
+		stats->mPolicy = atoi(buf);
 		ret = false;
 		break;
 

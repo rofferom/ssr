@@ -46,6 +46,11 @@ public:
 
 		uint64_t    mUtime;
 		uint64_t    mStime;
+
+		int64_t	    mPriority;
+		int64_t	    mNice;
+		uint32_t    mRtPriority;
+		uint32_t    mPolicy;
 	};
 
 	struct ThreadStats {
@@ -58,6 +63,11 @@ public:
 
 		uint64_t    mUtime;
 		uint64_t    mStime;
+
+		int64_t	    mPriority;
+		int64_t	    mNice;
+		uint32_t    mRtPriority;
+		uint32_t    mPolicy;
 	};
 
 	struct AcquisitionDuration {

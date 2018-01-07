@@ -400,6 +400,18 @@ int SystemMonitor::initStructDescs()
 	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mStime, "stime");
 	RETURN_IF_REGISTER_FAILED(ret);
 
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mPriority, "priority");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mNice, "nice");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mRtPriority, "rtpriority");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ProcessStats, mPolicy, "policy");
+	RETURN_IF_REGISTER_FAILED(ret);
+
 	// ThreadStats
 	type = "threadstats";
 
@@ -425,6 +437,18 @@ int SystemMonitor::initStructDescs()
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mStime, "stime");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mPriority, "priority");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mNice, "nice");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mRtPriority, "rtpriority");
+	RETURN_IF_REGISTER_FAILED(ret);
+
+	ret = REGISTER_RAW_VALUE(desc, ThreadStats, mPolicy, "policy");
 	RETURN_IF_REGISTER_FAILED(ret);
 
 	// Acquisition duration
