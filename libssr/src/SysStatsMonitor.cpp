@@ -1,12 +1,51 @@
+#include <assert.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include "ssr_priv.hpp"
 
-#define PROCSTAT_PATH "/proc/stat"
-#define MEMINFO_PATH "/proc/meminfo"
+int SysStatsMonitor::DataSink::open()
+{
+	return mRawStats.open(mFsPath);
+}
+
+void SysStatsMonitor::DataSink::close()
+{
+	mRawStats.close();
+}
+
+bool SysStatsMonitor::DataSink::processRawStats(
+		SystemMonitor::SystemStats *stats)
+{
+	int ret;
+
+	// The sysfs file hasn't been opened yet: retry to open.
+	// The first read will be done later, so we need to return false here.
+	if (mRawStats.mFd == -1) {
+		mRawStats.open(mFsPath);
+		return false;
+	}
+
+	// There is no pending data
+	if (!mRawStats.mPending)
+		return false;
+
+	assert(mParseStatsCb);
+	ret = mParseStatsCb(mRawStats.mContent, stats);
+	if (ret < 0) {
+		mRawStats.close();
+		return false;
+	}
+
+	return true;
+}
 
 SysStatsMonitor::SysStatsMonitor()
 {
+	mProcStats.mFsPath = "/proc/stat";
+	mProcStats.mParseStatsCb = pfstools::readSystemStats;
+
+	mMemInfo.mFsPath = "/proc/meminfo";
+	mMemInfo.mParseStatsCb = pfstools::readMeminfoStats;
 }
 
 SysStatsMonitor::~SysStatsMonitor()
@@ -17,90 +56,37 @@ SysStatsMonitor::~SysStatsMonitor()
 
 int SysStatsMonitor::init()
 {
-	mProcStats.open(PROCSTAT_PATH);
-	mMemInfo.open(MEMINFO_PATH);
-
-	return 0;
-}
-
-int SysStatsMonitor::readRawStats()
-{
 	int ret;
 
-	if (mProcStats.mFd == -1 || mMemInfo.mFd == -1)
-		return 0;
-
-	ret = pfstools::readRawStats(&mProcStats);
+	ret = mProcStats.open();
 	if (ret < 0)
-		return 0;
+		return ret;
 
-	ret = pfstools::readRawStats(&mMemInfo);
+	ret = mMemInfo.open();
 	if (ret < 0)
-		return 0;
-
-	return 0;
-}
-
-int SysStatsMonitor::checkStatFile(
-		const char *path,
-		pfstools::RawStats *rawStats)
-{
-	int ret;
-
-	if (rawStats->mFd == -1)
-		ret = rawStats->open(path);
-	else if (!rawStats->mPending)
-		ret = -EAGAIN;
-	else
-		ret = 0;
+		return ret;
 
 	return ret;
+}
+
+void SysStatsMonitor::readRawStats()
+{
+	pfstools::readRawStats(&mProcStats.mRawStats);
+	pfstools::readRawStats(&mMemInfo.mRawStats);
 }
 
 int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 {
 	SystemMonitor::SystemStats stats;
-	bool dataPending = false;
-	int ret;
+	bool newData = false;
 
-	// Check /proc/stat status
-	ret = checkStatFile(PROCSTAT_PATH, &mProcStats);
-	if (ret != -EAGAIN) {
-		if (ret < 0) {
-			LOGI("%s:%d", __FILE__, __LINE__);
-			return ret;
-		}
-
-		ret = pfstools::readSystemStats(mProcStats.mContent, &stats);
-		if (ret < 0) {
-			mProcStats.close();
-			return ret;
-		}
-	} else {
-		dataPending = true;
-	}
-
-	// Check /proc/meminfo
-	ret = checkStatFile(MEMINFO_PATH, &mMemInfo);
-	if (ret != -EAGAIN) {
-		if (ret < 0) {
-			LOGI("%s:%d", __FILE__, __LINE__);
-			return ret;
-		}
-
-		ret = pfstools::readMeminfoStats(mMemInfo.mContent, &stats);
-		if (ret < 0) {
-			mMemInfo.close();
-			return ret;
-		}
-	} else {
-		dataPending = true;
-	}
+	newData = mProcStats.processRawStats(&stats);
+	newData |= mMemInfo.processRawStats(&stats);
 
 	// Notify
-	if (!dataPending && cb.mSystemStats) {
-		stats.mTs = mProcStats.mTs;
-		stats.mAcqEnd = mProcStats.mAcqEnd;
+	if (newData && cb.mSystemStats) {
+		stats.mTs = mProcStats.mRawStats.mTs;
+		stats.mAcqEnd = mProcStats.mRawStats.mAcqEnd;
 		cb.mSystemStats(stats, cb.mUserdata);
 	}
 

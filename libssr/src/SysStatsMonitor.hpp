@@ -3,16 +3,22 @@
 
 class SysStatsMonitor {
 private:
-	// /proc/stat
-	pfstools::RawStats mProcStats;
+	struct DataSink {
+		const char *mFsPath;
+		pfstools::RawStats mRawStats;
+		int (*mParseStatsCb)(char *s, SystemMonitor::SystemStats *stats);
 
-	// /proc/meminfo
-	pfstools::RawStats mMemInfo;
+		int open();
+		void close();
+		bool processRawStats(SystemMonitor::SystemStats *stats);
+	};
 
 private:
-	static int checkStatFile(
-		const char *path,
-		pfstools::RawStats *rawStats);
+	// /proc/stat
+	DataSink mProcStats;
+
+	// /proc/meminfo
+	DataSink mMemInfo;
 
 public:
 	SysStatsMonitor();
@@ -20,9 +26,8 @@ public:
 
 	int init();
 
-	int readRawStats();
+	void readRawStats();
 	int processRawStats(const SystemMonitor::Callbacks &cb);
-
 };
 
 #endif // __SYS_STATS_MONITOR__
