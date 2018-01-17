@@ -757,18 +757,21 @@ static SysStatLine getSystemStatsLine(const char *s)
 	return SYSSTAT_UNKNOWN;
 }
 
-int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
+int readSystemStats(RawStats *rawStats,
+		SystemMonitor::SystemStats *stats)
 {
 	TokenizerCb cb;
 	SysStatLine lineType;
 	bool endOfString = false;
 	bool process = true;
+	char *s;
 	char *end;
 	int ret;
 
-	if (!s || !stats)
+	if (!rawStats || !stats)
 		return -EINVAL;
 
+	s = rawStats->mContent;
 	for (int line = 0; process && !endOfString; line++) {
 		ret = getNextLine(s, &end, &endOfString);
 		if (ret < 0)
@@ -809,7 +812,8 @@ int readSystemStats(char *s, SystemMonitor::SystemStats *stats)
 	return 0;
 }
 
-int readMeminfoStats(char *s, SystemMonitor::SystemStats *stats)
+int readMeminfoStats(RawStats *rawStats,
+		SystemMonitor::SystemStats *stats)
 {
 	const struct {
 		const char *name;
@@ -834,11 +838,13 @@ int readMeminfoStats(char *s, SystemMonitor::SystemStats *stats)
 
 	MeminfoParam memParam;
 	bool endOfString = false;
+	char *s;
 	char *end;
 	int line;
 	size_t i;
 	int ret;
 
+	s = rawStats->mContent;
 	for (line = 0; remainingFields && !endOfString; line++) {
 		ret = getNextLine(s, &end, &endOfString);
 		if (ret < 0)
@@ -872,20 +878,22 @@ int readMeminfoStats(char *s, SystemMonitor::SystemStats *stats)
 	return 0;
 }
 
-int readProcessStats(const char *s, SystemMonitor::ProcessStats *stats)
+int readProcessStats(const RawStats *rawStats,
+		SystemMonitor::ProcessStats *stats)
 {
 	if (!stats)
 		return -EINVAL;
 
-	return tokenizeStats(s, processStatsCb, stats);
+	return tokenizeStats(rawStats->mContent, processStatsCb, stats);
 }
 
-int readThreadStats(const char *s, SystemMonitor::ThreadStats *stats)
+int readThreadStats(const RawStats *rawStats,
+		SystemMonitor::ThreadStats *stats)
 {
 	if (!stats)
 			return -EINVAL;
 
-	return tokenizeStats(s, threadStatsCb, stats);
+	return tokenizeStats(rawStats->mContent, threadStatsCb, stats);
 }
 
 } // namespace pfstools

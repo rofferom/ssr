@@ -30,7 +30,7 @@ bool SysStatsMonitor::DataSink::processRawStats(
 		return false;
 
 	assert(mParseStatsCb);
-	ret = mParseStatsCb(mRawStats.mContent, stats);
+	ret = mParseStatsCb(&mRawStats, stats);
 	if (ret < 0) {
 		mRawStats.close();
 		return false;

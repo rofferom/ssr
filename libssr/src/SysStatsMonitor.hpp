@@ -6,7 +6,10 @@ private:
 	struct DataSink {
 		const char *mFsPath;
 		pfstools::RawStats mRawStats;
-		int (*mParseStatsCb)(char *s, SystemMonitor::SystemStats *stats);
+
+		int (*mParseStatsCb)(
+				pfstools::RawStats *rawStats,
+				SystemMonitor::SystemStats *stats);
 
 		int open();
 		void close();

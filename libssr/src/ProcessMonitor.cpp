@@ -60,7 +60,7 @@ int ProcessMonitor::addNewThread(int tid)
 		return ret;
 	}
 
-	ret = pfstools::readThreadStats(info.mRawStats.mContent, &stats);
+	ret = pfstools::readThreadStats(&info.mRawStats, &stats);
 	if (ret < 0)
 		return ret;
 
@@ -159,7 +159,7 @@ int ProcessMonitor::processRawThreadsStats(const SystemMonitor::Callbacks &cb)
 			continue;
 		}
 
-		ret = pfstools::readThreadStats(threadInfo->mRawStats.mContent,
+		ret = pfstools::readThreadStats(&threadInfo->mRawStats,
 						&threadStats);
 		if (ret < 0)
 			continue;
@@ -308,8 +308,7 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 		// known.
 		ret = openProcessAndThreadsFd();
 	} else {
-		ret = pfstools::readProcessStats(mStats.mContent,
-						 &processStats);
+		ret = pfstools::readProcessStats(&mStats, &processStats);
 		if (ret < 0)
 			return ret;
 
