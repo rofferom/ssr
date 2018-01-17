@@ -86,7 +86,7 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	// Notify
 	if (newData && cb.mSystemStats) {
 		stats.mTs = mProcStats.mRawStats.mTs;
-		stats.mAcqEnd = mProcStats.mRawStats.mAcqEnd;
+		stats.mAcqEnd = mMemInfo.mRawStats.mAcqEnd;
 		cb.mSystemStats(stats, cb.mUserdata);
 	}
 
