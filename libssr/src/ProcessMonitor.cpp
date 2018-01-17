@@ -209,7 +209,7 @@ int ProcessMonitor::openProcessAndThreadsFd()
 
 	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
 
-	ret = mRawStats.open(path);
+	ret = mStats.open(path);
 	if (ret < 0) {
 		mState = AcqState::failed;
 		return ret;
@@ -239,7 +239,7 @@ int ProcessMonitor::cleanProcessAndThreadsFd()
 
 	// Close process fd. If the process hasn't been found, the fd is not
 	// valid.
-	mRawStats.close();
+	mStats.close();
 
 	// Close threads fd
 	for (auto p : mThreads) {
@@ -266,13 +266,13 @@ int ProcessMonitor::readRawStats()
 {
 	int ret;
 
-	if (mRawStats.mFd == -1) {
-		mRawStats.mPending = false;
+	if (mStats.mFd == -1) {
+		mStats.mPending = false;
 		return 0;
 	}
 
 	// Read process stats
-	ret = pfstools::readRawStats(&mRawStats);
+	ret = pfstools::readRawStats(&mStats);
 	if (ret < 0) {
 		if (!mName.empty()) {
 			LOGN("Process %d-%s has stopped",
@@ -303,12 +303,12 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 		// all the existing pid. It should mean that the process has
 		// stopped. Avoid any further acquisition
 		return 0;
-	} else if (!mRawStats.mPending) {
+	} else if (!mStats.mPending) {
 		// Acquisition has failed. This means the process is currently not
 		// known.
 		ret = openProcessAndThreadsFd();
 	} else {
-		ret = pfstools::readProcessStats(mRawStats.mContent,
+		ret = pfstools::readProcessStats(mStats.mContent,
 						 &processStats);
 		if (ret < 0)
 			return ret;
@@ -320,8 +320,8 @@ int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 		}
 
 		if (cb.mProcessStats) {
-			processStats.mTs = mRawStats.mTs;
-			processStats.mAcqEnd = mRawStats.mAcqEnd;
+			processStats.mTs = mStats.mTs;
+			processStats.mAcqEnd = mStats.mAcqEnd;
 			cb.mProcessStats(processStats, cb.mUserdata);
 		}
 

@@ -11,14 +11,14 @@ SysStatsMonitor::SysStatsMonitor()
 
 SysStatsMonitor::~SysStatsMonitor()
 {
-	mRawProcStats.close();
-	mRawMemInfo.close();
+	mProcStats.close();
+	mMemInfo.close();
 }
 
 int SysStatsMonitor::init()
 {
-	mRawProcStats.open(PROCSTAT_PATH);
-	mRawMemInfo.open(MEMINFO_PATH);
+	mProcStats.open(PROCSTAT_PATH);
+	mMemInfo.open(MEMINFO_PATH);
 
 	return 0;
 }
@@ -27,14 +27,14 @@ int SysStatsMonitor::readRawStats()
 {
 	int ret;
 
-	if (mRawProcStats.mFd == -1 || mRawMemInfo.mFd == -1)
+	if (mProcStats.mFd == -1 || mMemInfo.mFd == -1)
 		return 0;
 
-	ret = pfstools::readRawStats(&mRawProcStats);
+	ret = pfstools::readRawStats(&mProcStats);
 	if (ret < 0)
 		return 0;
 
-	ret = pfstools::readRawStats(&mRawMemInfo);
+	ret = pfstools::readRawStats(&mMemInfo);
 	if (ret < 0)
 		return 0;
 
@@ -64,16 +64,16 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	int ret;
 
 	// Check /proc/stat status
-	ret = checkStatFile(PROCSTAT_PATH, &mRawProcStats);
+	ret = checkStatFile(PROCSTAT_PATH, &mProcStats);
 	if (ret != -EAGAIN) {
 		if (ret < 0) {
 			LOGI("%s:%d", __FILE__, __LINE__);
 			return ret;
 		}
 
-		ret = pfstools::readSystemStats(mRawProcStats.mContent, &stats);
+		ret = pfstools::readSystemStats(mProcStats.mContent, &stats);
 		if (ret < 0) {
-			mRawProcStats.close();
+			mProcStats.close();
 			return ret;
 		}
 	} else {
@@ -81,16 +81,16 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 	}
 
 	// Check /proc/meminfo
-	ret = checkStatFile(MEMINFO_PATH, &mRawMemInfo);
+	ret = checkStatFile(MEMINFO_PATH, &mMemInfo);
 	if (ret != -EAGAIN) {
 		if (ret < 0) {
 			LOGI("%s:%d", __FILE__, __LINE__);
 			return ret;
 		}
 
-		ret = pfstools::readMeminfoStats(mRawMemInfo.mContent, &stats);
+		ret = pfstools::readMeminfoStats(mMemInfo.mContent, &stats);
 		if (ret < 0) {
-			mRawMemInfo.close();
+			mMemInfo.close();
 			return ret;
 		}
 	} else {
@@ -99,8 +99,8 @@ int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 
 	// Notify
 	if (!dataPending && cb.mSystemStats) {
-		stats.mTs = mRawProcStats.mTs;
-		stats.mAcqEnd = mRawProcStats.mAcqEnd;
+		stats.mTs = mProcStats.mTs;
+		stats.mAcqEnd = mProcStats.mAcqEnd;
 		cb.mSystemStats(stats, cb.mUserdata);
 	}
 

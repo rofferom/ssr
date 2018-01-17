@@ -30,7 +30,7 @@ private:
 	const SystemMonitor::Config *mConfig;
 	const SystemMonitor::SystemConfig *mSysSettings;
 
-	pfstools::RawStats mRawStats;
+	pfstools::RawStats mStats;
 
 	std::map<int, ThreadInfo> mThreads;
 

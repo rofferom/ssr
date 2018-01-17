@@ -4,10 +4,10 @@
 class SysStatsMonitor {
 private:
 	// /proc/stat
-	pfstools::RawStats mRawProcStats;
+	pfstools::RawStats mProcStats;
 
 	// /proc/meminfo
-	pfstools::RawStats mRawMemInfo;
+	pfstools::RawStats mMemInfo;
 
 private:
 	static int checkStatFile(
