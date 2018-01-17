@@ -8,7 +8,7 @@
 
 ProcessMonitor::ProcessMonitor(const char *name,
 			       const SystemMonitor::Config *config,
-			       const SystemMonitor::SystemConfig *sysSettings)
+			       const SystemConfig *sysSettings)
 {
 	mResearchType = ResearchType::byName;
 	mState = AcqState::pending;
@@ -20,7 +20,7 @@ ProcessMonitor::ProcessMonitor(const char *name,
 
 ProcessMonitor::ProcessMonitor(int pid,
 			       const SystemMonitor::Config *config,
-			       const SystemMonitor::SystemConfig *sysSettings)
+			       const SystemConfig *sysSettings)
 {
 	mResearchType = ResearchType::byPid;
 	mState = AcqState::pending;
@@ -37,7 +37,7 @@ ProcessMonitor::~ProcessMonitor()
 
 int ProcessMonitor::addNewThread(int tid)
 {
-	SystemMonitor::ThreadStats stats;
+	ThreadStats stats;
 	ThreadInfo info;
 	char path[128];
 	int ret;
@@ -148,7 +148,7 @@ int ProcessMonitor::readRawThreadsStats()
 int ProcessMonitor::processRawThreadsStats(const SystemMonitor::Callbacks &cb)
 {
 	std::list<std::map<int, ThreadInfo>::iterator> removeList;
-	SystemMonitor::ThreadStats threadStats;
+	ThreadStats threadStats;
 	int ret;
 
 	for (auto i = mThreads.begin(); i != mThreads.end(); i++) {
@@ -295,7 +295,7 @@ int ProcessMonitor::readRawStats()
 
 int ProcessMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 {
-	SystemMonitor::ProcessStats processStats;
+	ProcessStats processStats;
 	int ret;
 
 	if (mState == AcqState::failed && mResearchType == ResearchType::byPid) {

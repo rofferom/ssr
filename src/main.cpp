@@ -173,7 +173,7 @@ static int initStructDescs()
 }
 
 static void systemStatsCb(
-		const SystemMonitor::SystemStats &stats,
+		const SystemStats &stats,
 		void *userdata)
 {
 	SystemRecorder *recorder = (SystemRecorder *) userdata;
@@ -185,7 +185,7 @@ static void systemStatsCb(
 }
 
 static void processStatsCb(
-		const SystemMonitor::ProcessStats &stats,
+		const ProcessStats &stats,
 		void *userdata)
 {
 	SystemRecorder *recorder = (SystemRecorder *) userdata;
@@ -197,7 +197,7 @@ static void processStatsCb(
 }
 
 static void threadStatsCb(
-		const SystemMonitor::ThreadStats &stats,
+		const ThreadStats &stats,
 		void *userdata)
 {
 	SystemRecorder *recorder = (SystemRecorder *) userdata;
@@ -209,7 +209,7 @@ static void threadStatsCb(
 }
 
 static void resultsBeginCb(
-		const SystemMonitor::AcquisitionDuration &stats,
+		const AcquisitionDuration &stats,
 		void *userdata)
 {
 	SystemRecorder *recorder = (SystemRecorder *) userdata;
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
 	Params params;
 	std::string outputPath;
 	ProgramParameters progParameters;
-	SystemMonitor::SystemConfig systemConfig;
+	SystemConfig systemConfig;
 	SystemMonitor::Callbacks cb;
 	SystemMonitor *mon = nullptr;
 	SystemMonitor::Config monConfig;

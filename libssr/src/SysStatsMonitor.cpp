@@ -14,7 +14,7 @@ void SysStatsMonitor::DataSink::close()
 }
 
 bool SysStatsMonitor::DataSink::processRawStats(
-		SystemMonitor::SystemStats *stats)
+		SystemStats *stats)
 {
 	int ret;
 
@@ -77,7 +77,7 @@ void SysStatsMonitor::readRawStats()
 
 int SysStatsMonitor::processRawStats(const SystemMonitor::Callbacks &cb)
 {
-	SystemMonitor::SystemStats stats;
+	SystemStats stats;
 	bool newData = false;
 
 	newData = mProcStats.processRawStats(&stats);

@@ -3,68 +3,68 @@
 
 class EventLoop;
 
+struct SystemConfig {
+	int32_t mClkTck;
+	int32_t mPagesize ;
+};
+
+struct SystemStats {
+	uint64_t    mTs;
+	uint64_t    mAcqEnd;
+
+	// Durations
+	uint64_t    mUtime;
+	uint64_t    mNice;
+	uint64_t    mStime;
+	uint64_t    mIdle;
+	uint64_t    mIoWait;
+	uint64_t    mIrq;
+	uint64_t    mSoftIrq;
+
+	// Occurences
+	uint64_t    mIrqCount;
+	uint64_t    mSoftIrqCount;
+	uint64_t    mCtxSwitchCount;
+
+	// Ram usage
+	uint64_t    mRamTotal;
+	uint64_t    mRamAvailable;
+	uint64_t    mRamFree;
+};
+
+struct ProcessStats {
+	uint64_t    mTs;
+	uint64_t    mAcqEnd;
+
+	uint32_t    mPid;
+	char        mName[64];
+	uint32_t    mVsize;
+	uint32_t    mRss;
+	uint16_t    mThreadCount;
+
+	uint64_t    mUtime;
+	uint64_t    mStime;
+};
+
+struct ThreadStats {
+	uint64_t    mTs;
+	uint64_t    mAcqEnd;
+
+	uint32_t    mPid;
+	uint32_t    mTid;
+	char        mName[64];
+
+	uint64_t    mUtime;
+	uint64_t    mStime;
+};
+
+struct AcquisitionDuration {
+	uint64_t    mStart;
+	uint64_t    mEnd;
+};
+
 class SystemMonitor {
 public:
-	struct SystemConfig {
-		int32_t mClkTck;
-		int32_t mPagesize ;
-	};
-
-	struct SystemStats {
-		uint64_t    mTs;
-		uint64_t    mAcqEnd;
-
-		// Durations
-		uint64_t    mUtime;
-		uint64_t    mNice;
-		uint64_t    mStime;
-		uint64_t    mIdle;
-		uint64_t    mIoWait;
-		uint64_t    mIrq;
-		uint64_t    mSoftIrq;
-
-		// Occurences
-		uint64_t    mIrqCount;
-		uint64_t    mSoftIrqCount;
-		uint64_t    mCtxSwitchCount;
-
-		// Ram usage
-		uint64_t    mRamTotal;
-		uint64_t    mRamAvailable;
-		uint64_t    mRamFree;
-	};
-
-	struct ProcessStats {
-		uint64_t    mTs;
-		uint64_t    mAcqEnd;
-
-		uint32_t    mPid;
-		char        mName[64];
-		uint32_t    mVsize;
-		uint32_t    mRss;
-		uint16_t    mThreadCount;
-
-		uint64_t    mUtime;
-		uint64_t    mStime;
-	};
-
-	struct ThreadStats {
-		uint64_t    mTs;
-		uint64_t    mAcqEnd;
-
-		uint32_t    mPid;
-		uint32_t    mTid;
-		char        mName[64];
-
-		uint64_t    mUtime;
-		uint64_t    mStime;
-	};
-
-	struct AcquisitionDuration {
-		uint64_t    mStart;
-		uint64_t    mEnd;
-	};
-
 	struct Callbacks {
 		void (*mSystemStats) (const SystemStats &stats, void *userdata);
 		void (*mProcessStats) (const ProcessStats &stats, void *userdata);

@@ -28,7 +28,7 @@ private:
 	int mPid;
 	std::string mName;
 	const SystemMonitor::Config *mConfig;
-	const SystemMonitor::SystemConfig *mSysSettings;
+	const SystemConfig *mSysSettings;
 
 	pfstools::RawStats mStats;
 
@@ -50,11 +50,11 @@ private:
 public:
 	ProcessMonitor(const char *name,
 		       const SystemMonitor::Config *config,
-		       const SystemMonitor::SystemConfig *sysSettings);
+		       const SystemConfig *sysSettings);
 
 	ProcessMonitor(int pid,
 		       const SystemMonitor::Config *config,
-		       const SystemMonitor::SystemConfig *sysSettings);
+		       const SystemConfig *sysSettings);
 
 
 	~ProcessMonitor();

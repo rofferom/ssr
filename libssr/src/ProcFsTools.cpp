@@ -138,7 +138,7 @@ bool processStatsCb(int idx,
 		     const char *end,
 		     void *userdata)
 {
-	SystemMonitor::ProcessStats *stats = (SystemMonitor::ProcessStats *) userdata;
+	ProcessStats *stats = (ProcessStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -190,7 +190,7 @@ bool threadStatsCb(int idx,
 		   const char *end,
 		   void *userdata)
 {
-	SystemMonitor::ThreadStats *stats = (SystemMonitor::ThreadStats *) userdata;
+	ThreadStats *stats = (ThreadStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -285,7 +285,7 @@ bool processCpuCb(int idx,
 		  const char *end,
 		  void *userdata)
 {
-	auto stats = (SystemMonitor::SystemStats *) userdata;
+	auto stats = (SystemStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -337,7 +337,7 @@ bool processIrqCountCb(int idx,
 		       const char *end,
 		       void *userdata)
 {
-	auto stats = (SystemMonitor::SystemStats *) userdata;
+	auto stats = (SystemStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -365,7 +365,7 @@ bool processSoftIrqCountCb(int idx,
 			   const char *end,
 			   void *userdata)
 {
-	auto stats = (SystemMonitor::SystemStats *) userdata;
+	auto stats = (SystemStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -393,7 +393,7 @@ bool processCtxSwitchCountCb(int idx,
 			     const char *end,
 			     void *userdata)
 {
-	auto stats = (SystemMonitor::SystemStats *) userdata;
+	auto stats = (SystemStats *) userdata;
 	char buf[64];
 	bool ret = true;
 
@@ -758,7 +758,7 @@ static SysStatLine getSystemStatsLine(const char *s)
 }
 
 int readSystemStats(RawStats *rawStats,
-		SystemMonitor::SystemStats *stats)
+		SystemStats *stats)
 {
 	TokenizerCb cb;
 	SysStatLine lineType;
@@ -813,7 +813,7 @@ int readSystemStats(RawStats *rawStats,
 }
 
 int readMeminfoStats(RawStats *rawStats,
-		SystemMonitor::SystemStats *stats)
+		SystemStats *stats)
 {
 	const struct {
 		const char *name;
@@ -879,7 +879,7 @@ int readMeminfoStats(RawStats *rawStats,
 }
 
 int readProcessStats(const RawStats *rawStats,
-		SystemMonitor::ProcessStats *stats)
+		ProcessStats *stats)
 {
 	if (!stats)
 		return -EINVAL;
@@ -888,7 +888,7 @@ int readProcessStats(const RawStats *rawStats,
 }
 
 int readThreadStats(const RawStats *rawStats,
-		SystemMonitor::ThreadStats *stats)
+		ThreadStats *stats)
 {
 	if (!stats)
 			return -EINVAL;

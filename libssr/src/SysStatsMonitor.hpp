@@ -7,13 +7,12 @@ private:
 		const char *mFsPath;
 		pfstools::RawStats mRawStats;
 
-		int (*mParseStatsCb)(
-				pfstools::RawStats *rawStats,
-				SystemMonitor::SystemStats *stats);
+		int (*mParseStatsCb)(pfstools::RawStats *rawStats,
+				SystemStats *stats);
 
 		int open();
 		void close();
-		bool processRawStats(SystemMonitor::SystemStats *stats);
+		bool processRawStats(SystemStats *stats);
 	};
 
 private:

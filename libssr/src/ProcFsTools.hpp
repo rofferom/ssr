@@ -26,16 +26,16 @@ int findAllProcesses(std::list<int> *outPid);
 int readRawStats(RawStats *stats);
 
 int readSystemStats(RawStats *rawStats,
-		SystemMonitor::SystemStats *stats);
+		SystemStats *stats);
 
 int readMeminfoStats(RawStats *rawStats,
-		SystemMonitor::SystemStats *stats);
+		SystemStats *stats);
 
 int readProcessStats(const RawStats *rawStats,
-		SystemMonitor::ProcessStats *stats);
+		ProcessStats *stats);
 
 int readThreadStats(const RawStats *rawStats,
-		SystemMonitor::ThreadStats *stats);
+		ThreadStats *stats);
 
 } // namespace pfstools
 
