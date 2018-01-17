@@ -119,8 +119,6 @@ public:
 			const Config &config,
 			const Callbacks &cb,
 			SystemMonitor **monitor);
-
-	static int initStructDescs();
 };
 
 #endif // !__SYSTEM_MONITOR_HPP__

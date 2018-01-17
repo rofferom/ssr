@@ -11,12 +11,12 @@ private:
 
 public:
 	SystemRecorder();
-	virtual ~SystemRecorder();
+	~SystemRecorder();
 
-	virtual int open(const char *path);
-	virtual int close();
+	int open(const char *path);
+	int close();
 
-	virtual int flush();
+	int flush();
 
 	template <typename T>
 	int record(const T &params)
@@ -38,6 +38,8 @@ public:
 
 		return 0;
 	}
+
+	static int registerStructDescs();
 };
 
 #endif // !__SYSTEM_RECORDER_HPP__

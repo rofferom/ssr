@@ -149,7 +149,7 @@ static void sighandler(int s)
 	ctx.loop.abort();
 }
 
-static int initStructDescs()
+static void registerProgramParams()
 {
 	StructDesc *desc;
 	const char *type;
@@ -163,54 +163,24 @@ static int initStructDescs()
 
 	ret = REGISTER_STRING(desc, ProgramParameters, mParams, "params");
 	RETURN_IF_REGISTER_FAILED(ret);
+}
+
+static int registerStructDescs()
+{
+	int ret;
+
+	registerProgramParams();
 
 	// Initialize other available StructDesc
-	ret = SystemMonitor::initStructDescs();
+	ret = SystemRecorder::registerStructDescs();
 	if (ret < 0)
 		return 0;
 
 	return 0;
 }
 
-static void systemStatsCb(
-		const SystemStats &stats,
-		void *userdata)
-{
-	SystemRecorder *recorder = (SystemRecorder *) userdata;
-	int ret;
-
-	ret = recorder->record(stats);
-	if (ret < 0)
-		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
-}
-
-static void processStatsCb(
-		const ProcessStats &stats,
-		void *userdata)
-{
-	SystemRecorder *recorder = (SystemRecorder *) userdata;
-	int ret;
-
-	ret = recorder->record(stats);
-	if (ret < 0)
-		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
-}
-
-static void threadStatsCb(
-		const ThreadStats &stats,
-		void *userdata)
-{
-	SystemRecorder *recorder = (SystemRecorder *) userdata;
-	int ret;
-
-	ret = recorder->record(stats);
-	if (ret < 0)
-		LOGE("record() failed : %d(%s)", -ret, strerror(-ret));
-}
-
-static void resultsBeginCb(
-		const AcquisitionDuration &stats,
-		void *userdata)
+template <typename T>
+static void statsCb(const T &stats,void *userdata)
 {
 	SystemRecorder *recorder = (SystemRecorder *) userdata;
 	int ret;
@@ -301,7 +271,7 @@ int main(int argc, char *argv[])
 		return 1;
 
 	// Init StructDesc
-	ret = initStructDescs();
+	ret = registerStructDescs();
 	if (ret < 0) {
 		LOGE("Fail to initialize struct descriptions");
 		return 1;
@@ -323,10 +293,10 @@ int main(int argc, char *argv[])
 		goto error;
 
 	// Create monitor
-	cb.mSystemStats = systemStatsCb;
-	cb.mProcessStats = processStatsCb;
-	cb.mThreadStats = threadStatsCb;
-	cb.mResultsBegin = resultsBeginCb;
+	cb.mSystemStats = statsCb<SystemStats>;
+	cb.mProcessStats = statsCb<ProcessStats>;
+	cb.mThreadStats = statsCb<ThreadStats>;
+	cb.mResultsBegin = statsCb<AcquisitionDuration>;
 	cb.mUserdata = recorder;
 
 	monConfig.mRecordThreads = params.recordThreads;
