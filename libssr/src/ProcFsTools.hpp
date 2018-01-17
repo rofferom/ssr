@@ -1,8 +1,6 @@
 #ifndef __PROCSTATPARSER_HPP__
 #define __PROCSTATPARSER_HPP__
 
-#define STAT_SIZE 4096*2
-
 namespace pfstools {
 
 struct RawStats {
@@ -11,7 +9,9 @@ struct RawStats {
 	bool mPending;
 	uint64_t mTs;
 	uint64_t mAcqEnd;
-	char mContent[STAT_SIZE];
+
+	// procfs file content. Its size should be the same as a memory page
+	char mContent[4096];
 
 	RawStats();
 

@@ -11,7 +11,7 @@ public:
 
 class FileSink : public ISink {
 private:
-	uint8_t mBuffer[4*1028];
+	uint8_t mBuffer[BUFSIZ];
 	uint32_t mUsedSize;
 
 	FILE *mFile;
