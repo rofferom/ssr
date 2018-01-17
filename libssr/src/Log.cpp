@@ -8,9 +8,6 @@ static void logCbDefault(uint32_t prio, const char *fmt, va_list ap)
 	FILE *stream;
 	char strPrio;
 
-	if (prio > sLogLevel)
-		return;
-
 	switch (prio) {
 	case LOG_CRIT:
 		strPrio = 'C';
@@ -57,6 +54,9 @@ static log_cb_t sCb = logCbDefault;
 void __log(uint32_t prio, const char *fmt, ...)
 {
 	va_list ap;
+
+	if (prio > sLogLevel)
+		return;
 
 	va_start(ap, fmt);
 	sCb(prio, fmt, ap);
