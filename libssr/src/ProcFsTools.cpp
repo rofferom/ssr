@@ -252,23 +252,19 @@ bool testPidName(int pid, const char *name)
 	PidTestCtx testCtx;
 	char path[128];
 	pfstools::RawStats rawStats;
-	int fd;
 	int ret;
 
 	// Open procfs
 	snprintf(path, sizeof(path), "/proc/%d/stat", pid);
 
-	fd = open(path, O_RDONLY|O_CLOEXEC);
-	if (fd == -1) {
-		ret = -errno;
-		LOGE("Fail to open %s : %d(%m)", path, errno);
+	ret = rawStats.open(path);
+	if (ret < 0)
 		return ret;
-	}
 
 	// Read content
-	ret = pfstools::readRawStats(fd, &rawStats);
+	ret = pfstools::readRawStats(&rawStats);
 	if (ret < 0) {
-		close(fd);
+		rawStats.close();
 		return false;
 	}
 
@@ -276,7 +272,7 @@ bool testPidName(int pid, const char *name)
 	testCtx.mMatch = false;
 
 	ret = tokenizeStats(rawStats.mContent, pidTestCb, &testCtx);
-	close(fd);
+	rawStats.close();
 	if (ret < 0) {
 		return false;
 	}
@@ -578,6 +574,40 @@ int meminfoParseLine(char *s, MeminfoParam *result)
 
 namespace pfstools {
 
+RawStats::RawStats() :
+	mFd(-1),
+	mPending(false),
+	mTs(0),
+	mAcqEnd(0)
+{
+	mContent[0] = '\0';
+
+}
+
+int RawStats::open(const char *path)
+{
+	int ret;
+
+	ret = ::open(path, O_RDONLY|O_CLOEXEC);
+	if (ret == -1) {
+		ret = -errno;
+		LOGE("Fail to open %s : %d(%m)", path, errno);
+		return ret;
+	}
+
+	mFd = ret;
+
+	return 0;
+}
+
+void RawStats::close()
+{
+	if (mFd != -1) {
+		::close(mFd);
+		mFd = -1;
+	}
+}
+
 struct FindProcessCtx {
 	const char *mName;
 	int mPid;
@@ -656,16 +686,16 @@ static int getTimeNs(uint64_t *ns)
 	return 0;
 }
 
-int readRawStats(int fd, RawStats *stats)
+int readRawStats(RawStats *stats)
 {
 	ssize_t readRet;
 	int ret;
 
-	if (fd == -1 || !stats)
+	if (!stats || stats->mFd == -1)
 		return -EINVAL;
 
 	getTimeNs(&stats->mTs);
-	readRet = pread(fd, stats->mContent, sizeof(stats->mContent), 0);
+	readRet = pread(stats->mFd, stats->mContent, sizeof(stats->mContent), 0);
 	getTimeNs(&stats->mAcqEnd);
 	if (readRet == -1) {
 		ret = -errno;

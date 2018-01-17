@@ -6,17 +6,24 @@
 namespace pfstools {
 
 struct RawStats {
+	int mFd;
+
 	bool mPending;
 	uint64_t mTs;
 	uint64_t mAcqEnd;
 	char mContent[STAT_SIZE];
+
+	RawStats();
+
+	int open(const char *path);
+	void close();
 };
 
 int findProcess(const char *name, int *outPid);
 
 int findAllProcesses(std::list<int> *outPid);
 
-int readRawStats(int fd, RawStats *stats);
+int readRawStats(RawStats *stats);
 
 int readSystemStats(char *s, SystemMonitor::SystemStats *stats);
 

@@ -4,20 +4,15 @@
 class SysStatsMonitor {
 private:
 	// /proc/stat
-	int mProcStatFd;
 	pfstools::RawStats mRawProcStats;
 
 	// /proc/meminfo
-	int mMeminfoFd;
 	pfstools::RawStats mRawMemInfo;
 
 private:
 	static int checkStatFile(
-		int *fd,
 		const char *path,
 		pfstools::RawStats *rawStats);
-
-	static int openFile(const char *path, int *fd);
 
 public:
 	SysStatsMonitor();

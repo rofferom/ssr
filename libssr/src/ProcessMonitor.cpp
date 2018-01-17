@@ -12,7 +12,6 @@ ProcessMonitor::ProcessMonitor(const char *name,
 {
 	mResearchType = ResearchType::byName;
 	mState = AcqState::pending;
-	mStatFd = -1;
 	mName = name;
 	mPid = INVALID_PID;
 	mConfig = config;
@@ -25,7 +24,6 @@ ProcessMonitor::ProcessMonitor(int pid,
 {
 	mResearchType = ResearchType::byPid;
 	mState = AcqState::pending;
-	mStatFd = -1;
 	mPid = pid;
 	mConfig = config;
 	mSysSettings = sysSettings;
@@ -39,7 +37,6 @@ ProcessMonitor::~ProcessMonitor()
 
 int ProcessMonitor::addNewThread(int tid)
 {
-	pfstools::RawStats rawStats;
 	SystemMonitor::ThreadStats stats;
 	ThreadInfo info;
 	char path[128];
@@ -50,24 +47,20 @@ int ProcessMonitor::addNewThread(int tid)
 		 "/proc/%d/task/%d/stat",
 		 mPid, tid);
 
-	ret = open(path, O_RDONLY|O_CLOEXEC);
-	if (ret == -1) {
-		ret = -errno;
-		LOGE("Fail to open %s : %d(%m)", path, errno);
+	ret = info.mRawStats.open(path);
+	if (ret < 0)
 		return ret;
-	}
 
 	info.mTid = tid;
-	info.mFd = ret;
 
 	// Read stats to get its name
-	ret = pfstools::readRawStats(info.mFd, &rawStats);
+	ret = pfstools::readRawStats(&info.mRawStats);
 	if (ret < 0) {
-		close(info.mFd);
+		info.mRawStats.close();
 		return ret;
 	}
 
-	ret = pfstools::readThreadStats(rawStats.mContent, &stats);
+	ret = pfstools::readThreadStats(info.mRawStats.mContent, &stats);
 	if (ret < 0)
 		return ret;
 
@@ -83,7 +76,7 @@ int ProcessMonitor::addNewThread(int tid)
 	auto insertRet = mThreads.insert( {tid, info} );
 	if (!insertRet.second) {
 		LOGE("Fail to insert thread %d", tid);
-		close(info.mFd);
+		info.mRawStats.close();
 		return -EPERM;
 	}
 
@@ -146,9 +139,7 @@ int ProcessMonitor::readRawThreadsStats()
 {
 	for (auto &thread : mThreads) {
 		ThreadInfo *threadInfo = &thread.second;
-
-		pfstools::readRawStats(threadInfo->mFd,
-				       &threadInfo->mRawStats);
+		pfstools::readRawStats(&threadInfo->mRawStats);
 	}
 
 	return 0;
@@ -218,11 +209,9 @@ int ProcessMonitor::openProcessAndThreadsFd()
 
 	snprintf(path, sizeof(path), "/proc/%d/stat", mPid);
 
-	mStatFd = open(path, O_RDONLY|O_CLOEXEC);
-	if (mStatFd == -1) {
+	ret = mRawStats.open(path);
+	if (ret < 0) {
 		mState = AcqState::failed;
-		ret = -errno;
-		LOGE("Fail to open %s : %d(%m)", path, errno);
 		return ret;
 	}
 
@@ -250,14 +239,13 @@ int ProcessMonitor::cleanProcessAndThreadsFd()
 
 	// Close process fd. If the process hasn't been found, the fd is not
 	// valid.
-	if (mStatFd != -1) {
-		close(mStatFd);
-		mStatFd = -1;
-	}
+	mRawStats.close();
 
 	// Close threads fd
-	for (auto p : mThreads)
-		close(p.second.mFd);
+	for (auto p : mThreads) {
+		ThreadInfo &info = p.second;
+		info.mRawStats.close();
+	}
 
 	mThreads.clear();
 
@@ -278,13 +266,13 @@ int ProcessMonitor::readRawStats()
 {
 	int ret;
 
-	if (mStatFd == -1) {
+	if (mRawStats.mFd == -1) {
 		mRawStats.mPending = false;
 		return 0;
 	}
 
 	// Read process stats
-	ret = pfstools::readRawStats(mStatFd, &mRawStats);
+	ret = pfstools::readRawStats(&mRawStats);
 	if (ret < 0) {
 		if (!mName.empty()) {
 			LOGN("Process %d-%s has stopped",

@@ -16,7 +16,6 @@ private:
 
 	struct ThreadInfo {
 		int mTid;
-		int mFd;;
 		char mName[64];
 
 		pfstools::RawStats mRawStats;
@@ -26,7 +25,6 @@ private:
 	ResearchType mResearchType;
 
 	AcqState mState;
-	int mStatFd;
 	int mPid;
 	std::string mName;
 	const SystemMonitor::Config *mConfig;
